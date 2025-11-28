@@ -1,15 +1,21 @@
 name: pureflow
-description: A sample command-line application.
+description: A lightweight, fast, and type-safe reactive state management library for Dart.
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/arxdeus/pureflow
+homepage: https://github.com/arxdeus/pureflow
+issue_tracker: https://github.com/arxdeus/pureflow/issues
+documentation: https://github.com/arxdeus/pureflow#readme
+
+topics:
+  - state-management
+  - reactive
+  - signals
+  - pipeline
+  - state
 
 environment:
   sdk: ^3.0.0
 
-# Add regular dependencies here.
-dependencies:
-  path: ^1.9.0
-
 dev_dependencies:
-  lints: ^6.0.0
-  test: ^1.25.6
+  benchmark_harness: ^2.4.0
+  signals_core: ^6.2.0
