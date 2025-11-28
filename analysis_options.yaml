@@ -89,7 +89,7 @@ linter:
     - undefined_lint: ignore
     - always_declare_return_types
     - always_put_required_named_parameters_first
-    - always_require_non_null_named_parameters
+    # - always_require_non_null_named_parameters
     - always_use_package_imports
     - annotate_overrides
     - annotate_redeclares
@@ -112,7 +112,7 @@ linter:
     - avoid_relative_lib_imports
     - avoid_renaming_method_parameters
     - avoid_return_types_on_setters
-    - avoid_returning_null_for_future
+    # - avoid_returning_null_for_future
     - avoid_returning_null_for_void
     - avoid_returning_this
     - avoid_setters_without_getters
@@ -152,14 +152,14 @@ linter:
     - implementation_imports
     - implicit_reopen
     - invalid_case_patterns
-    - iterable_contains_unrelated_type
+    # - iterable_contains_unrelated_type
     - join_return_with_assignment
     - leading_newlines_in_multiline_strings
     - library_annotations
     - library_names
     - library_prefixes
     - library_private_types_in_public_api
-    - list_remove_unrelated_type
+    # - list_remove_unrelated_type
     - literal_only_boolean_expressions
     # - matching_super_parameters
     - missing_code_block_language_in_doc_comment

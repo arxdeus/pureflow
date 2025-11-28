@@ -4,4 +4,5 @@
 library;
 
 export 'src/computed.dart' show Computed;
+export 'src/pipeline/pipeline.dart';
 export 'src/signal.dart' show Signal;
