@@ -1,20 +1,21 @@
+import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:pureflow/pureflow.dart';
 
-/// Benchmark suite for PureFlow reactive primitives.
+/// Benchmark suite for PureFlow reactive primitives using benchmark_harness.
 void main() {
-  print('PureFlow - Performance Benchmark\n');
+  print('PureFlow - Performance Benchmark (benchmark_harness)\n');
   print('=' * 60);
 
-  _benchmarkSignalCreation();
-  _benchmarkSignalReads();
-  _benchmarkSignalWrites();
-  _benchmarkComputedCreation();
-  _benchmarkComputedReads();
-  _benchmarkComputedChain();
-  _benchmarkBatchUpdates();
-  _benchmarkDiamondDependency();
-  _benchmarkManyDependents();
-  _benchmarkMemoryEfficiency();
+  SignalCreationBenchmark().report();
+  SignalReadsBenchmark().report();
+  SignalWritesBenchmark().report();
+  ComputedCreationBenchmark().report();
+  ComputedReadsBenchmark().report();
+  ComputedChainBenchmark().report();
+  BatchUpdatesBenchmark().report();
+  DiamondDependencyBenchmark().report();
+  ManyDependentsBenchmark().report();
+  MemoryEfficiencyBenchmark().report();
 
   print('=' * 60);
   print('Benchmark complete.\n');
@@ -24,173 +25,228 @@ void main() {
 // Signal Benchmarks
 // ============================================================================
 
-void _benchmarkSignalCreation() {
-  const iterations = 100000;
+class SignalCreationBenchmark extends BenchmarkBase {
+  static const int _batchSize = 1000;
+  late List<Signal<int>> _signals;
 
-  final sw = Stopwatch()..start();
-  final signals = <Signal<int>>[];
+  SignalCreationBenchmark() : super('Signal creation');
 
-  for (var i = 0; i < iterations; i++) {
-    signals.add(Signal(i));
+  @override
+  void setup() {
+    _signals = [];
   }
 
-  sw.stop();
-  _printResult('Signal creation', iterations, sw.elapsedMicroseconds);
+  @override
+  void run() {
+    for (var i = 0; i < _batchSize; i++) {
+      _signals.add(Signal(i));
+    }
+  }
 
-  // Cleanup
-  for (final s in signals) {
-    s.dispose();
+  @override
+  void teardown() {
+    for (final s in _signals) {
+      s.dispose();
+    }
+    _signals.clear();
   }
 }
 
-void _benchmarkSignalReads() {
-  const iterations = 1000000;
-  final signal = Signal(42);
-  var sum = 0;
+class SignalReadsBenchmark extends BenchmarkBase {
+  static const int _readsPerRun = 1000;
+  late Signal<int> _signal;
+  int _sum = 0;
 
-  final sw = Stopwatch()..start();
+  SignalReadsBenchmark() : super('Signal reads');
 
-  for (var i = 0; i < iterations; i++) {
-    sum += signal.value;
+  @override
+  void setup() {
+    _signal = Signal(42);
+    _sum = 0;
   }
 
-  sw.stop();
-  _printResult('Signal reads', iterations, sw.elapsedMicroseconds);
+  @override
+  void run() {
+    for (var i = 0; i < _readsPerRun; i++) {
+      _sum += _signal.value;
+    }
+  }
 
-  // Prevent optimization
-  if (sum == 0) print('');
-  signal.dispose();
+  @override
+  void teardown() {
+    _signal.dispose();
+    // Prevent optimization
+    if (_sum == 0) print('');
+  }
 }
 
-void _benchmarkSignalWrites() {
-  const iterations = 100000;
-  final signal = Signal(0);
+class SignalWritesBenchmark extends BenchmarkBase {
+  static const int _writesPerRun = 1000;
+  late Signal<int> _signal;
 
-  final sw = Stopwatch()..start();
+  SignalWritesBenchmark() : super('Signal writes');
 
-  for (var i = 0; i < iterations; i++) {
-    signal.value = i;
+  @override
+  void setup() {
+    _signal = Signal(0);
   }
 
-  sw.stop();
-  _printResult('Signal writes', iterations, sw.elapsedMicroseconds);
+  @override
+  void run() {
+    for (var i = 0; i < _writesPerRun; i++) {
+      _signal.value = i;
+    }
+  }
 
-  signal.dispose();
+  @override
+  void teardown() {
+    _signal.dispose();
+  }
 }
 
 // ============================================================================
 // Computed Benchmarks
 // ============================================================================
 
-void _benchmarkComputedCreation() {
-  const iterations = 10000;
-  final source = Signal(1);
+class ComputedCreationBenchmark extends BenchmarkBase {
+  static const int _batchSize = 100;
+  late Signal<int> _source;
+  late List<Computed<int>> _computeds;
 
-  final sw = Stopwatch()..start();
-  final computeds = <Computed<int>>[];
+  ComputedCreationBenchmark() : super('Computed creation');
 
-  for (var i = 0; i < iterations; i++) {
-    computeds.add(Computed(() => source.value * 2));
+  @override
+  void setup() {
+    _source = Signal(1);
+    _computeds = [];
   }
 
-  sw.stop();
-  _printResult('Computed creation', iterations, sw.elapsedMicroseconds);
-
-  // Cleanup
-  for (final c in computeds) {
-    c.dispose();
+  @override
+  void run() {
+    for (var i = 0; i < _batchSize; i++) {
+      _computeds.add(Computed(() => _source.value * 2));
+    }
   }
-  source.dispose();
+
+  @override
+  void teardown() {
+    for (final c in _computeds) {
+      c.dispose();
+    }
+    _computeds.clear();
+    _source.dispose();
+  }
 }
 
-void _benchmarkComputedReads() {
-  const iterations = 100000;
-  final signal = Signal(10);
-  final computed = Computed(() => signal.value * 2);
-  var sum = 0;
+class ComputedReadsBenchmark extends BenchmarkBase {
+  static const int _readsPerRun = 1000;
+  late Signal<int> _signal;
+  late Computed<int> _computed;
+  int _sum = 0;
 
-  final sw = Stopwatch()..start();
+  ComputedReadsBenchmark() : super('Computed reads (cached)');
 
-  for (var i = 0; i < iterations; i++) {
-    sum += computed.value;
+  @override
+  void setup() {
+    _signal = Signal(10);
+    _computed = Computed(() => _signal.value * 2);
+    _sum = 0;
   }
 
-  sw.stop();
-  _printResult('Computed reads (cached)', iterations, sw.elapsedMicroseconds);
+  @override
+  void run() {
+    for (var i = 0; i < _readsPerRun; i++) {
+      _sum += _computed.value;
+    }
+  }
 
-  // Prevent optimization
-  if (sum == 0) print('');
-  computed.dispose();
-  signal.dispose();
+  @override
+  void teardown() {
+    _computed.dispose();
+    _signal.dispose();
+    // Prevent optimization
+    if (_sum == 0) print('');
+  }
 }
 
-void _benchmarkComputedChain() {
-  const iterations = 10000;
-  final source = Signal(1);
+class ComputedChainBenchmark extends BenchmarkBase {
+  static const int _updatesPerRun = 100;
+  late Signal<int> _source;
+  late Computed<int> _c1, _c2, _c3, _c4, _c5;
 
-  // Create chain: source -> c1 -> c2 -> c3 -> c4 -> c5
-  final c1 = Computed(() => source.value + 1);
-  final c2 = Computed(() => c1.value + 1);
-  final c3 = Computed(() => c2.value + 1);
-  final c4 = Computed(() => c3.value + 1);
-  final c5 = Computed(() => c4.value + 1);
+  ComputedChainBenchmark() : super('Computed chain (5 deep)');
 
-  final sw = Stopwatch()..start();
-
-  for (var i = 0; i < iterations; i++) {
-    source.value = i;
-    final _ = c5.value; // Force recomputation through chain
+  @override
+  void setup() {
+    _source = Signal(1);
+    _c1 = Computed(() => _source.value + 1);
+    _c2 = Computed(() => _c1.value + 1);
+    _c3 = Computed(() => _c2.value + 1);
+    _c4 = Computed(() => _c3.value + 1);
+    _c5 = Computed(() => _c4.value + 1);
   }
 
-  sw.stop();
-  _printResult('Computed chain (5 deep)', iterations, sw.elapsedMicroseconds);
+  @override
+  void run() {
+    for (var i = 0; i < _updatesPerRun; i++) {
+      _source.value = i;
+      final _ = _c5.value; // Force recomputation through chain
+    }
+  }
 
-  c5.dispose();
-  c4.dispose();
-  c3.dispose();
-  c2.dispose();
-  c1.dispose();
-  source.dispose();
+  @override
+  void teardown() {
+    _c5.dispose();
+    _c4.dispose();
+    _c3.dispose();
+    _c2.dispose();
+    _c1.dispose();
+    _source.dispose();
+  }
 }
 
 // ============================================================================
 // Batch Benchmarks
 // ============================================================================
 
-void _benchmarkBatchUpdates() {
-  const iterations = 10000;
-  const signalCount = 10;
+class BatchUpdatesBenchmark extends BenchmarkBase {
+  static const int _updatesPerRun = 100;
+  static const int _signalCount = 10;
+  late List<Signal<int>> _signals;
+  late Computed<int> _sum;
 
-  final signals = List.generate(signalCount, Signal.new);
-  final sum = Computed(() {
-    var total = 0;
-    for (final s in signals) {
-      total += s.value;
-    }
-    return total;
-  });
+  BatchUpdatesBenchmark() : super('Batch updates (10 signals)');
 
-  final sw = Stopwatch()..start();
-
-  for (var i = 0; i < iterations; i++) {
-    Signal.batch(() {
-      for (var j = 0; j < signalCount; j++) {
-        signals[j].value = i + j;
+  @override
+  void setup() {
+    _signals = List.generate(_signalCount, Signal.new);
+    _sum = Computed(() {
+      var total = 0;
+      for (final s in _signals) {
+        total += s.value;
       }
+      return total;
     });
-    final _ = sum.value;
   }
 
-  sw.stop();
-  _printResult(
-    'Batch updates (10 signals)',
-    iterations,
-    sw.elapsedMicroseconds,
-  );
+  @override
+  void run() {
+    for (var i = 0; i < _updatesPerRun; i++) {
+      Signal.batch(() {
+        for (var j = 0; j < _signalCount; j++) {
+          _signals[j].value = i + j;
+        }
+      });
+      final _ = _sum.value;
+    }
+  }
 
-  sum.dispose();
-  for (final s in signals) {
-    s.dispose();
+  @override
+  void teardown() {
+    _sum.dispose();
+    for (final s in _signals) {
+      s.dispose();
+    }
   }
 }
 
@@ -198,120 +254,112 @@ void _benchmarkBatchUpdates() {
 // Complex Dependency Benchmarks
 // ============================================================================
 
-void _benchmarkDiamondDependency() {
-  const iterations = 10000;
+class DiamondDependencyBenchmark extends BenchmarkBase {
+  static const int _updatesPerRun = 100;
+  late Signal<int> _source;
+  late Computed<int> _left, _right, _bottom;
 
-  //     source
-  //    /      \
-  //  left    right
-  //    \      /
-  //     bottom
+  DiamondDependencyBenchmark() : super('Diamond dependency');
 
-  final source = Signal(1);
-  final left = Computed(() => source.value + 1);
-  final right = Computed(() => source.value + 2);
-  final bottom = Computed(() => left.value + right.value);
-
-  final sw = Stopwatch()..start();
-
-  for (var i = 0; i < iterations; i++) {
-    source.value = i;
-    final _ = bottom.value;
+  @override
+  void setup() {
+    //     source
+    //    /      \
+    //  left    right
+    //    \      /
+    //     bottom
+    _source = Signal(1);
+    _left = Computed(() => _source.value + 1);
+    _right = Computed(() => _source.value + 2);
+    _bottom = Computed(() => _left.value + _right.value);
   }
 
-  sw.stop();
-  _printResult('Diamond dependency', iterations, sw.elapsedMicroseconds);
-
-  bottom.dispose();
-  right.dispose();
-  left.dispose();
-  source.dispose();
-}
-
-void _benchmarkManyDependents() {
-  const iterations = 1000;
-  const dependentCount = 100;
-
-  final source = Signal(0);
-  final computeds = List.generate(
-    dependentCount,
-    (i) => Computed(() => source.value + i),
-  );
-
-  final sw = Stopwatch()..start();
-
-  for (var i = 0; i < iterations; i++) {
-    source.value = i;
-    // Read all to trigger recomputation
-    for (final c in computeds) {
-      final _ = c.value;
+  @override
+  void run() {
+    for (var i = 0; i < _updatesPerRun; i++) {
+      _source.value = i;
+      final _ = _bottom.value;
     }
   }
 
-  sw.stop();
-  _printResult('Many dependents (100)', iterations, sw.elapsedMicroseconds);
-
-  for (final c in computeds) {
-    c.dispose();
+  @override
+  void teardown() {
+    _bottom.dispose();
+    _right.dispose();
+    _left.dispose();
+    _source.dispose();
   }
-  source.dispose();
+}
+
+class ManyDependentsBenchmark extends BenchmarkBase {
+  static const int _updatesPerRun = 10;
+  static const int _dependentCount = 100;
+  late Signal<int> _source;
+  late List<Computed<int>> _computeds;
+
+  ManyDependentsBenchmark() : super('Many dependents (100)');
+
+  @override
+  void setup() {
+    _source = Signal(0);
+    _computeds = List.generate(
+      _dependentCount,
+      (i) => Computed(() => _source.value + i),
+    );
+  }
+
+  @override
+  void run() {
+    for (var i = 0; i < _updatesPerRun; i++) {
+      _source.value = i;
+      // Read all to trigger recomputation
+      for (final c in _computeds) {
+        final _ = c.value;
+      }
+    }
+  }
+
+  @override
+  void teardown() {
+    for (final c in _computeds) {
+      c.dispose();
+    }
+    _source.dispose();
+  }
 }
 
 // ============================================================================
 // Memory Efficiency
 // ============================================================================
 
-void _benchmarkMemoryEfficiency() {
-  const count = 10000;
+class MemoryEfficiencyBenchmark extends BenchmarkBase {
+  static const int _signalCount = 1000;
+  late List<Signal<int>> _signals;
+  int _sum = 0;
 
-  // Measure signals without dependents (should use minimal memory)
-  final signals = <Signal<int>>[];
+  MemoryEfficiencyBenchmark() : super('Signals w/o deps');
 
-  final sw = Stopwatch()..start();
-
-  for (var i = 0; i < count; i++) {
-    signals.add(Signal(i));
+  @override
+  void setup() {
+    // Create signals without dependents (should use minimal memory)
+    _signals = List.generate(_signalCount, Signal.new);
+    _sum = 0;
   }
 
-  // Read values without computed context (no dependency tracking)
-  var sum = 0;
-  for (final s in signals) {
-    sum += s.value;
+  @override
+  void run() {
+    // Read values without computed context (no dependency tracking)
+    for (final s in _signals) {
+      _sum += s.value;
+    }
   }
 
-  sw.stop();
-  _printResult('Signals w/o deps (memory test)', count, sw.elapsedMicroseconds);
-
-  // Prevent optimization
-  if (sum == 0) print('');
-
-  for (final s in signals) {
-    s.dispose();
+  @override
+  void teardown() {
+    for (final s in _signals) {
+      s.dispose();
+    }
+    // Prevent optimization
+    if (_sum == 0) print('');
   }
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-void _printResult(String name, int iterations, int microseconds) {
-  final ms = microseconds / 1000;
-  final opsPerSec = (iterations / microseconds * 1000000).round();
-  final nsPerOp = (microseconds * 1000 / iterations).toStringAsFixed(1);
-
-  print(
-    '${name.padRight(30)} ${iterations.toString().padLeft(8)} ops  '
-    '${ms.toStringAsFixed(2).padLeft(8)} ms  '
-    '${nsPerOp.padLeft(6)} ns/op  '
-    '${_formatNumber(opsPerSec).padLeft(10)} ops/s',
-  );
-}
-
-String _formatNumber(int n) {
-  if (n >= 1000000) {
-    return '${(n / 1000000).toStringAsFixed(1)}M';
-  } else if (n >= 1000) {
-    return '${(n / 1000).toStringAsFixed(1)}K';
-  }
-  return n.toString();
 }
