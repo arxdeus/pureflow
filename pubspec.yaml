@@ -17,5 +17,6 @@ environment:
   sdk: ^3.0.0
 
 dev_dependencies:
+  test: ^1.28.0
   benchmark_harness: ^2.4.0
   signals_core: ^6.2.0
