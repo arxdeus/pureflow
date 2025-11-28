@@ -1,4 +1,4 @@
-import 'impl.dart';
+import 'package:pureflow/src/impl.dart';
 
 /// A reactive signal that holds a value and notifies listeners when it changes.
 abstract class Signal<T> {

@@ -30,7 +30,7 @@ void _benchmarkSignalCreation() {
   final sw = Stopwatch()..start();
   final signals = <Signal<int>>[];
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     signals.add(Signal(i));
   }
 
@@ -46,11 +46,11 @@ void _benchmarkSignalCreation() {
 void _benchmarkSignalReads() {
   const iterations = 1000000;
   final signal = Signal(42);
-  int sum = 0;
+  var sum = 0;
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     sum += signal.value;
   }
 
@@ -68,7 +68,7 @@ void _benchmarkSignalWrites() {
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     signal.value = i;
   }
 
@@ -89,7 +89,7 @@ void _benchmarkComputedCreation() {
   final sw = Stopwatch()..start();
   final computeds = <Computed<int>>[];
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     computeds.add(Computed(() => source.value * 2));
   }
 
@@ -107,11 +107,11 @@ void _benchmarkComputedReads() {
   const iterations = 100000;
   final signal = Signal(10);
   final computed = Computed(() => signal.value * 2);
-  int sum = 0;
+  var sum = 0;
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     sum += computed.value;
   }
 
@@ -137,7 +137,7 @@ void _benchmarkComputedChain() {
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     source.value = i;
     final _ = c5.value; // Force recomputation through chain
   }
@@ -161,9 +161,9 @@ void _benchmarkBatchUpdates() {
   const iterations = 10000;
   const signalCount = 10;
 
-  final signals = List.generate(signalCount, (i) => Signal(i));
+  final signals = List.generate(signalCount, Signal.new);
   final sum = Computed(() {
-    int total = 0;
+    var total = 0;
     for (final s in signals) {
       total += s.value;
     }
@@ -172,9 +172,9 @@ void _benchmarkBatchUpdates() {
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     Signal.batch(() {
-      for (int j = 0; j < signalCount; j++) {
+      for (var j = 0; j < signalCount; j++) {
         signals[j].value = i + j;
       }
     });
@@ -214,7 +214,7 @@ void _benchmarkDiamondDependency() {
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     source.value = i;
     final _ = bottom.value;
   }
@@ -240,7 +240,7 @@ void _benchmarkManyDependents() {
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < iterations; i++) {
+  for (var i = 0; i < iterations; i++) {
     source.value = i;
     // Read all to trigger recomputation
     for (final c in computeds) {
@@ -269,12 +269,12 @@ void _benchmarkMemoryEfficiency() {
 
   final sw = Stopwatch()..start();
 
-  for (int i = 0; i < count; i++) {
+  for (var i = 0; i < count; i++) {
     signals.add(Signal(i));
   }
 
   // Read values without computed context (no dependency tracking)
-  int sum = 0;
+  var sum = 0;
   for (final s in signals) {
     sum += s.value;
   }

@@ -20,7 +20,7 @@ class PipelineEventContext {
   final Stopwatch _stopwatch;
   bool _isCancelled = false; // 0 = active, 1 = cancelled
 
-  PipelineEventContext(this._taskStream, this._stopwatch);
+  PipelineEventContext._(this._taskStream, this._stopwatch);
 
   /// Returns true if the pipeline event is still active (not cancelled).
   @pragma('vm:prefer-inline')
@@ -51,7 +51,7 @@ class _PipelineEvent<ResultType> {
     required this.completer,
     required _TaskStream taskStream,
   }) : _taskStream = taskStream {
-    context = PipelineEventContext(_taskStream, _stopwatch);
+    context = PipelineEventContext._(_taskStream, _stopwatch);
   }
 
   @pragma('vm:prefer-inline')
@@ -170,12 +170,10 @@ class _TaskStream {
   Stream<dynamic> _processEvent(dynamic event) {
     // Fast type check
     if (event is! _PipelineEvent<dynamic>) {
-      return Stream<dynamic>.empty();
+      return const Stream<dynamic>.empty();
     }
     _activeEvents.add(event);
-    return _SinglePipelineEventStream._(event, (e) {
-      _activeEvents.remove(e);
-    });
+    return _SinglePipelineEventStream._(event, _activeEvents.remove);
   }
 
   @pragma('vm:prefer-inline')
@@ -219,10 +217,7 @@ class _TaskStream {
       _completeWaitingCompleter();
 
       // Cancel the subscription
-      final sub = _subscription;
-      if (sub != null) {
-        await sub.cancel();
-      }
+      await _subscription?.cancel();
       _subscription = null;
       return;
     }
@@ -258,7 +253,7 @@ class _TaskStream {
     _completeWaitingCompleter();
 
     // Wait for all events to complete
-    await Future.wait(futures, eagerError: false);
+    await Future.wait(futures);
 
     // After all events complete, mark as inactive
     _isActive = false;
@@ -363,7 +358,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   Object? _lastData;
   Object? _lastError;
   StackTrace? _lastStackTrace;
-  final List<_AsFutureRequest> _asFutureRequests = [];
+  final List<_AsFutureRequest<Object?>> _asFutureRequests = [];
 
   _SinglePipelineEventSubscription._(
     this.event,
@@ -381,11 +376,11 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     try {
       final result = await event.task(event.context);
       if (_shouldEmit) {
-        _completeWithResult(result);
+        await _completeWithResult(result);
       }
     } catch (error, stackTrace) {
       if (_shouldEmit) {
-        _completeWithError(error, stackTrace);
+        await _completeWithError(error, stackTrace);
       }
     } finally {
       event._stopwatch.stop();
@@ -511,7 +506,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   }
 
   @override
-  Future<void> cancel() async {
+  Future<void> cancel() {
     if (_status.isCanceled) {
       return _taskFuture ?? Future<void>.syncValue(null);
     }
@@ -566,13 +561,13 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   Future<E> asFuture<E>([E? futureValue]) {
     if (_status.asFutureCompleted) {
       if (_lastError != null) {
-        return Future<E>.error(_lastError!, _lastStackTrace!);
+        return Future<E>.error(_lastError!, _lastStackTrace);
       }
       return Future<E>.value(futureValue ?? _lastData as E);
     }
     final request = _AsFutureRequest<E>(
       futureValue: futureValue,
-      completer: Completer<E>(),
+      completer: Completer<E>.sync(),
     );
     _asFutureRequests.add(request);
     return request.completer.future;

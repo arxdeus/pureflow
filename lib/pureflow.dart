@@ -3,5 +3,5 @@
 /// Faster than signals_core in all benchmarks.
 library;
 
-export 'src/signal.dart' show Signal;
 export 'src/computed.dart' show Computed;
+export 'src/signal.dart' show Signal;

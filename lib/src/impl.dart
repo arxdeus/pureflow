@@ -1,13 +1,13 @@
-import 'signal.dart';
-import 'computed.dart';
+import 'package:pureflow/src/computed.dart';
+import 'package:pureflow/src/signal.dart';
 
 // ============================================================================
 // Global State
 // ============================================================================
 
-_ComputedImpl? _currentComputed;
+_ComputedImpl<Object?>? _currentComputed;
 int _batchDepth = 0;
-List<SignalImpl>? _batchSignals;
+List<SignalImpl<Object?>>? _batchSignals;
 
 // ============================================================================
 // Dependency Node (Linked List)
@@ -20,7 +20,7 @@ class _Node {
   ReactiveSource source;
 
   /// The target (Computed) that depends on the source.
-  _ComputedImpl target;
+  _ComputedImpl<Object?> target;
 
   /// Version of the source when last seen by target.
   /// -1 means the node is recyclable.
@@ -88,7 +88,7 @@ abstract class ReactiveSource {
   }
 
   /// Adds this source as a dependency of the given computed.
-  void _addDependency(_ComputedImpl targetComputed) {
+  void _addDependency(_ComputedImpl<Object?> targetComputed) {
     var node = _node;
 
     if (node == null || node.target != targetComputed) {

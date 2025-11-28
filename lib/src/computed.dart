@@ -1,4 +1,4 @@
-import 'impl.dart';
+import 'package:pureflow/src/impl.dart';
 
 /// A computed value that automatically tracks its dependencies.
 ///
@@ -15,4 +15,3 @@ abstract class Computed<T> {
   /// Disposes the computed and releases all resources.
   void dispose();
 }
-
