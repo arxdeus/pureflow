@@ -7,7 +7,7 @@ typedef EventMapper<EventType, ResultType> =
 
 /// EventTransformer processes a stream of events using an EventMapper.
 typedef EventTransformer<EventType, ResultType> =
-    Stream<ResultType> Function<EventType, ResultType>(
+    Stream<ResultType> Function(
       Stream<EventType> source,
       EventMapper<EventType, ResultType> process,
     );
@@ -119,10 +119,7 @@ class _TaskStream {
 
   void _initializeProcessing() {
     final sourceStream = _createSourceStream();
-    final processedStream = transformer<dynamic, dynamic>(
-      sourceStream,
-      _processEvent,
-    );
+    final processedStream = transformer(sourceStream, _processEvent);
     _subscription = processedStream.listen(
       null, // Results are handled in _SinglePipelineEventSubscription
       onError: _handleError,
