@@ -17,7 +17,7 @@ List<SignalImpl>? _batchSignals;
 /// Uses version numbers instead of storing values to minimize memory usage.
 class _Node {
   /// The source (Signal or Computed) that the target depends on.
-  Object source;
+  ReactiveSource source;
 
   /// The target (Computed) that depends on the source.
   _ComputedImpl target;
@@ -27,11 +27,11 @@ class _Node {
   int version;
 
   /// Links for the source's list of dependents (targets).
-  _Node? prevTarget;
+  _Node? previousTarget;
   _Node? nextTarget;
 
   /// Links for the target's list of dependencies (sources).
-  _Node? prevSource;
+  _Node? previousSource;
   _Node? nextSource;
 
   /// Rollback node for context switching during evaluation.
@@ -41,27 +41,109 @@ class _Node {
 }
 
 // ============================================================================
-// Signal Implementation
+// Reactive Source Base Class
 // ============================================================================
 
-class SignalImpl<T> implements Signal<T> {
-  T _value;
-  int _flags = 0; // bit 0: disposed, bit 1: in batch
-  int _version = 0;
-
+/// Abstract base class for reactive sources (Signal and Computed).
+/// Contains shared dependency tracking logic.
+abstract class ReactiveSource {
   /// Head of linked list of dependent computeds.
   _Node? _targets;
 
   /// Current node being used during dependency tracking.
   _Node? _node;
 
+  /// Version number, incremented on value changes.
+  int _version = 0;
+
+  /// Subscribes a node to this source's target list.
+  void _subscribeNode(_Node node) {
+    if (_targets != node && node.previousTarget == null) {
+      node.nextTarget = _targets;
+      if (_targets != null) {
+        _targets!.previousTarget = node;
+      }
+      _targets = node;
+    }
+  }
+
+  /// Unsubscribes a node from this source's target list.
+  void _unsubscribeNode(_Node node) {
+    if (_targets == null) return;
+
+    final previousNode = node.previousTarget;
+    final nextNode = node.nextTarget;
+
+    if (previousNode != null) {
+      previousNode.nextTarget = nextNode;
+      node.previousTarget = null;
+    }
+    if (nextNode != null) {
+      nextNode.previousTarget = previousNode;
+      node.nextTarget = null;
+    }
+    if (node == _targets) {
+      _targets = nextNode;
+    }
+  }
+
+  /// Adds this source as a dependency of the given computed.
+  void _addDependency(_ComputedImpl targetComputed) {
+    var node = _node;
+
+    if (node == null || node.target != targetComputed) {
+      // New dependency - create node and add to target's source list
+      node = _Node(source: this, target: targetComputed, version: _version)
+        ..previousSource = targetComputed._sources
+        ..rollbackNode = _node;
+
+      if (targetComputed._sources != null) {
+        targetComputed._sources!.nextSource = node;
+      }
+      targetComputed._sources = node;
+      _node = node;
+
+      // Subscribe to this source
+      _subscribeNode(node);
+    } else if (node.version == -1) {
+      // Reuse existing node
+      node.version = _version;
+
+      // Move to end of source list if not already there
+      if (node.nextSource != null) {
+        node.nextSource!.previousSource = node.previousSource;
+        if (node.previousSource != null) {
+          node.previousSource!.nextSource = node.nextSource;
+        }
+        node.previousSource = targetComputed._sources;
+        node.nextSource = null;
+        targetComputed._sources!.nextSource = node;
+        targetComputed._sources = node;
+      }
+    } else {
+      // Already tracking, update version
+      node.version = _version;
+    }
+  }
+}
+
+// ============================================================================
+// Signal Implementation
+// ============================================================================
+
+class SignalImpl<T> extends ReactiveSource implements Signal<T> {
+  T _value;
+
+  /// Raw status flags: bit 0 = disposed, bit 1 = inBatch
+  int _statusCode = 0;
+
   SignalImpl(this._value);
 
   /// Runs a function within a batch context.
-  static R batch<R>(R Function() fn) {
+  static R batch<R>(R Function() action) {
     _batchDepth++;
     try {
-      return fn();
+      return action();
     } finally {
       if (--_batchDepth == 0) _flushBatch();
     }
@@ -71,11 +153,11 @@ class SignalImpl<T> implements Signal<T> {
     final signals = _batchSignals;
     if (signals == null || signals.isEmpty) return;
 
-    for (final s in signals) {
-      s._flags &= ~2; // Clear batch flag
-      if ((s._flags & 1) == 0) {
+    for (final signal in signals) {
+      signal._statusCode &= ~2; // Clear inBatch flag
+      if ((signal._statusCode & 1) == 0) {
         // Not disposed
-        for (var node = s._targets; node != null; node = node.nextTarget) {
+        for (var node = signal._targets; node != null; node = node.nextTarget) {
           node.target._markDirty();
         }
       }
@@ -85,16 +167,17 @@ class SignalImpl<T> implements Signal<T> {
 
   @override
   T get value {
-    final c = _currentComputed;
-    if (c != null) {
-      _addDependency(c);
+    final targetComputed = _currentComputed;
+    if (targetComputed != null) {
+      _addDependency(targetComputed);
     }
     return _value;
   }
 
   @override
   set value(T newValue) {
-    if ((_flags & 1) != 0 ||
+    // Check disposed (bit 0) or value unchanged
+    if ((_statusCode & 1) != 0 ||
         identical(_value, newValue) ||
         _value == newValue) {
       return;
@@ -103,8 +186,9 @@ class SignalImpl<T> implements Signal<T> {
     _version++;
 
     if (_batchDepth > 0) {
-      if ((_flags & 2) == 0) {
-        _flags |= 2;
+      // Check inBatch (bit 1)
+      if ((_statusCode & 2) == 0) {
+        _statusCode |= 2; // Set inBatch flag
         (_batchSignals ??= []).add(this);
       }
       return;
@@ -124,78 +208,10 @@ class SignalImpl<T> implements Signal<T> {
 
   @override
   void dispose() {
-    if ((_flags & 1) != 0) return;
-    _flags |= 1;
+    if ((_statusCode & 1) != 0) return; // Already disposed
+    _statusCode |= 1; // Set disposed flag
     _targets = null;
     _node = null;
-  }
-
-  /// Add this signal as a dependency of the given computed.
-  void _addDependency(_ComputedImpl c) {
-    var node = _node;
-
-    if (node == null || node.target != c) {
-      // New dependency - create node and add to target's source list
-      node = _Node(source: this, target: c, version: _version)
-        ..prevSource = c._sources
-        ..rollbackNode = _node;
-
-      if (c._sources != null) {
-        c._sources!.nextSource = node;
-      }
-      c._sources = node;
-      _node = node;
-
-      // Subscribe to this signal
-      _subscribeNode(node);
-    } else if (node.version == -1) {
-      // Reuse existing node
-      node.version = _version;
-
-      // Move to end of source list if not already there
-      if (node.nextSource != null) {
-        node.nextSource!.prevSource = node.prevSource;
-        if (node.prevSource != null) {
-          node.prevSource!.nextSource = node.nextSource;
-        }
-        node.prevSource = c._sources;
-        node.nextSource = null;
-        c._sources!.nextSource = node;
-        c._sources = node;
-      }
-    } else {
-      // Already tracking, update version
-      node.version = _version;
-    }
-  }
-
-  void _subscribeNode(_Node node) {
-    if (_targets != node && node.prevTarget == null) {
-      node.nextTarget = _targets;
-      if (_targets != null) {
-        _targets!.prevTarget = node;
-      }
-      _targets = node;
-    }
-  }
-
-  void _unsubscribeNode(_Node node) {
-    if (_targets == null) return;
-
-    final prev = node.prevTarget;
-    final next = node.nextTarget;
-
-    if (prev != null) {
-      prev.nextTarget = next;
-      node.prevTarget = null;
-    }
-    if (next != null) {
-      next.prevTarget = prev;
-      node.nextTarget = null;
-    }
-    if (node == _targets) {
-      _targets = next;
-    }
   }
 }
 
@@ -203,54 +219,48 @@ class SignalImpl<T> implements Signal<T> {
 // Computed Implementation
 // ============================================================================
 
-class _ComputedImpl<T> implements Computed<T> {
+class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   final T Function() _compute;
   T? _value;
 
-  // Flags: bit 0 = dirty, bit 1 = disposed, bit 2 = running
-  int _flags = 1;
-  int _version = 0;
+  /// Status flags: bit 0 = dirty, bit 1 = disposed, bit 2 = running
+  int _statusCode = 1; // Start dirty
 
   /// Tail of linked list of dependencies (sources).
   _Node? _sources;
-
-  /// Head of linked list of dependents (targets).
-  _Node? _targets;
-
-  /// Current node for dependency tracking.
-  _Node? _node;
 
   _ComputedImpl(this._compute);
 
   @override
   T get value {
-    // Check for cycle
-    if ((_flags & 4) != 0) {
+    final status = _statusCode;
+
+    // Check for cycle (bit 2 = running)
+    if ((status & 4) != 0) {
       throw StateError('Cycle detected in computed');
     }
 
-    // Recompute if dirty
-    if ((_flags & 1) != 0) {
+    // Recompute if dirty (bit 0 = dirty)
+    if ((status & 1) != 0) {
       _recompute();
     }
 
-    _trackSelfAsDependency();
-    return _value as T;
-  }
-
-  void _trackSelfAsDependency() {
-    if ((_flags & 2) != 0) return; // disposed
-
-    final c = _currentComputed;
-    if (c != null && !identical(c, this)) {
-      _addDependency(c);
+    // Track self as dependency (inline for performance)
+    // Skip if disposed (bit 1)
+    if ((status & 2) == 0) {
+      final targetComputed = _currentComputed;
+      if (targetComputed != null && !identical(targetComputed, this)) {
+        _addDependency(targetComputed);
+      }
     }
+
+    return _value as T;
   }
 
   @override
   void dispose() {
-    if ((_flags & 2) != 0) return;
-    _flags |= 2;
+    if ((_statusCode & 2) != 0) return; // Already disposed
+    _statusCode |= 2; // Set disposed flag
     _cleanupSources(disposeAll: true);
     _sources = null;
     _targets = null;
@@ -258,8 +268,8 @@ class _ComputedImpl<T> implements Computed<T> {
   }
 
   void _markDirty() {
-    if ((_flags & 3) != 0) return; // already dirty or disposed
-    _flags |= 1;
+    if ((_statusCode & 3) != 0) return; // Already dirty or disposed
+    _statusCode |= 1; // Set dirty flag
 
     // Propagate dirty flag to dependents
     for (var node = _targets; node != null; node = node.nextTarget) {
@@ -268,40 +278,40 @@ class _ComputedImpl<T> implements Computed<T> {
   }
 
   void _recompute() {
-    final disposed = (_flags & 2) != 0;
-    if (disposed) {
+    // Check if disposed (bit 1)
+    if ((_statusCode & 2) != 0) {
       // Just compute without tracking
-      final prev = _currentComputed;
+      final previousComputed = _currentComputed;
       try {
         _value = _compute();
       } finally {
-        _currentComputed = prev;
+        _currentComputed = previousComputed;
       }
-      _flags &= ~1;
+      _statusCode &= ~1; // Clear dirty flag
       return;
     }
 
-    // Mark as running to detect cycles
-    _flags |= 4;
+    // Mark as running to detect cycles (bit 2)
+    _statusCode |= 4;
 
     // Prepare sources for reuse
     _prepareSources();
 
-    final prev = _currentComputed;
+    final previousComputed = _currentComputed;
     _currentComputed = this;
     final oldValue = _value;
 
     try {
       _value = _compute();
     } finally {
-      _currentComputed = prev;
-      _flags &= ~4; // Clear running flag
+      _currentComputed = previousComputed;
+      _statusCode &= ~4; // Clear running flag
     }
 
     // Cleanup unused sources
     _cleanupSources();
 
-    _flags &= ~1; // Clear dirty flag
+    _statusCode &= ~1; // Clear dirty flag
 
     // Notify if value changed
     final newValue = _value;
@@ -314,13 +324,8 @@ class _ComputedImpl<T> implements Computed<T> {
   void _prepareSources() {
     for (var node = _sources; node != null; node = node.nextSource) {
       final source = node.source;
-      if (source is SignalImpl) {
-        node.rollbackNode = source._node;
-        source._node = node;
-      } else if (source is _ComputedImpl) {
-        node.rollbackNode = source._node;
-        source._node = node;
-      }
+      node.rollbackNode = source._node;
+      source._node = node;
       node.version = -1;
 
       // Move tail pointer
@@ -333,116 +338,38 @@ class _ComputedImpl<T> implements Computed<T> {
   /// Remove unused sources (those still with version = -1).
   void _cleanupSources({bool disposeAll = false}) {
     var node = _sources;
-    _Node? head;
+    _Node? headNode;
 
     while (node != null) {
-      final prev = node.prevSource;
+      final previousNode = node.previousSource;
 
       if (disposeAll || node.version == -1) {
         // Unsubscribe from source
-        final source = node.source;
-        if (source is SignalImpl) {
-          source._unsubscribeNode(node);
-        } else if (source is _ComputedImpl) {
-          source._unsubscribeNode(node);
-        }
+        node.source._unsubscribeNode(node);
 
         // Remove from list
-        if (prev != null) {
-          prev.nextSource = node.nextSource;
+        if (previousNode != null) {
+          previousNode.nextSource = node.nextSource;
         }
         if (node.nextSource != null) {
-          node.nextSource!.prevSource = prev;
+          node.nextSource!.previousSource = previousNode;
         }
       } else {
-        head = node;
+        headNode = node;
       }
 
       // Restore rollback node
       final source = node.source;
-      if (source is SignalImpl) {
-        source._node = node.rollbackNode;
-      } else if (source is _ComputedImpl) {
-        source._node = node.rollbackNode;
-      }
+      source._node = node.rollbackNode;
       node.rollbackNode = null;
 
-      node = prev;
+      node = previousNode;
     }
 
-    _sources = head;
-  }
-
-  /// Add this computed as a dependency of another computed.
-  void _addDependency(_ComputedImpl c) {
-    var node = _node;
-
-    if (node == null || node.target != c) {
-      // New dependency
-      node = _Node(source: this, target: c, version: _version)
-        ..prevSource = c._sources
-        ..rollbackNode = _node;
-
-      if (c._sources != null) {
-        c._sources!.nextSource = node;
-      }
-      c._sources = node;
-      _node = node;
-
-      _subscribeNode(node);
-    } else if (node.version == -1) {
-      // Reuse existing node
-      node.version = _version;
-
-      if (node.nextSource != null) {
-        node.nextSource!.prevSource = node.prevSource;
-        if (node.prevSource != null) {
-          node.prevSource!.nextSource = node.nextSource;
-        }
-        node.prevSource = c._sources;
-        node.nextSource = null;
-        c._sources!.nextSource = node;
-        c._sources = node;
-      }
-    } else {
-      node.version = _version;
-    }
-  }
-
-  void _subscribeNode(_Node node) {
-    if (_targets != node && node.prevTarget == null) {
-      node.nextTarget = _targets;
-      if (_targets != null) {
-        _targets!.prevTarget = node;
-      }
-      _targets = node;
-    }
-  }
-
-  void _unsubscribeNode(_Node node) {
-    if (_targets == null) return;
-
-    final prev = node.prevTarget;
-    final next = node.nextTarget;
-
-    if (prev != null) {
-      prev.nextTarget = next;
-      node.prevTarget = null;
-    }
-    if (next != null) {
-      next.prevTarget = prev;
-      node.nextTarget = null;
-    }
-    if (node == _targets) {
-      _targets = next;
-    }
+    _sources = headNode;
   }
 }
 
 class ComputedImpl<T> extends _ComputedImpl<T> {
   ComputedImpl(super.compute);
 }
-
-// ============================================================================
-// Batch Implementation
-// ============================================================================
