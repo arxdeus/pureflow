@@ -14,7 +14,6 @@ List<SignalImpl<Object?>>? _batchSignals;
 // ============================================================================
 
 /// A linked list node for tracking dependencies between signals and computeds.
-/// Uses version numbers instead of storing values to minimize memory usage.
 class _Node {
   /// The source (Signal or Computed) that the target depends on.
   ReactiveSource source;
@@ -22,9 +21,9 @@ class _Node {
   /// The target (Computed) that depends on the source.
   _ComputedImpl<Object?> target;
 
-  /// Version of the source when last seen by target.
-  /// -1 means the node is recyclable.
-  int version;
+  /// Whether this node is actively tracking a dependency.
+  /// false means the node is recyclable.
+  bool isActive = true;
 
   /// Links for the source's list of dependents (targets).
   _Node? previousTarget;
@@ -37,7 +36,7 @@ class _Node {
   /// Rollback node for context switching during evaluation.
   _Node? rollbackNode;
 
-  _Node({required this.source, required this.target, this.version = 0});
+  _Node({required this.source, required this.target});
 }
 
 // ============================================================================
@@ -52,9 +51,6 @@ abstract class ReactiveSource {
 
   /// Current node being used during dependency tracking.
   _Node? _node;
-
-  /// Version number, incremented on value changes.
-  int _version = 0;
 
   /// Subscribes a node to this source's target list.
   void _subscribeNode(_Node node) {
@@ -93,7 +89,7 @@ abstract class ReactiveSource {
 
     if (node == null || node.target != targetComputed) {
       // New dependency - create node and add to target's source list
-      node = _Node(source: this, target: targetComputed, version: _version)
+      node = _Node(source: this, target: targetComputed)
         ..previousSource = targetComputed._sources
         ..rollbackNode = _node;
 
@@ -105,9 +101,9 @@ abstract class ReactiveSource {
 
       // Subscribe to this source
       _subscribeNode(node);
-    } else if (node.version == -1) {
+    } else if (!node.isActive) {
       // Reuse existing node
-      node.version = _version;
+      node.isActive = true;
 
       // Move to end of source list if not already there
       if (node.nextSource != null) {
@@ -120,10 +116,8 @@ abstract class ReactiveSource {
         targetComputed._sources!.nextSource = node;
         targetComputed._sources = node;
       }
-    } else {
-      // Already tracking, update version
-      node.version = _version;
     }
+    // If already active - nothing to do
   }
 }
 
@@ -183,7 +177,6 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
       return;
     }
     _value = newValue;
-    _version++;
 
     if (_batchDepth > 0) {
       // Check inBatch (bit 1)
@@ -299,7 +292,6 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
 
     final previousComputed = _currentComputed;
     _currentComputed = this;
-    final oldValue = _value;
 
     try {
       _value = _compute();
@@ -312,21 +304,15 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
     _cleanupSources();
 
     _statusCode &= ~1; // Clear dirty flag
-
-    // Notify if value changed
-    final newValue = _value;
-    if (!identical(oldValue, newValue) && oldValue != newValue) {
-      _version++;
-    }
   }
 
-  /// Mark all source nodes as reusable (version = -1).
+  /// Mark all source nodes as recyclable.
   void _prepareSources() {
     for (var node = _sources; node != null; node = node.nextSource) {
       final source = node.source;
       node.rollbackNode = source._node;
       source._node = node;
-      node.version = -1;
+      node.isActive = false;
 
       // Move tail pointer
       if (node.nextSource == null) {
@@ -335,7 +321,7 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
     }
   }
 
-  /// Remove unused sources (those still with version = -1).
+  /// Remove unused sources (those still inactive).
   void _cleanupSources({bool disposeAll = false}) {
     var node = _sources;
     _Node? headNode;
@@ -343,7 +329,7 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
     while (node != null) {
       final previousNode = node.previousSource;
 
-      if (disposeAll || node.version == -1) {
+      if (disposeAll || !node.isActive) {
         // Unsubscribe from source
         node.source._unsubscribeNode(node);
 
