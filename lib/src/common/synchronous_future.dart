@@ -4,6 +4,8 @@
 
 import 'dart:async';
 
+import 'package:meta/meta.dart';
+
 /// A [Future] whose [then] implementation calls the callback immediately.
 ///
 /// This is similar to [Future.value], except that the value is available in
@@ -16,7 +18,8 @@ import 'dart:async';
 /// such bimodal behavior.**
 ///
 /// A [SynchronousFuture] will never complete with an error.
-class SynchronousFuture<T> implements Future<T> {
+@internal
+final class SynchronousFuture<T> implements Future<T> {
   const SynchronousFuture(this._value);
   final T _value;
 

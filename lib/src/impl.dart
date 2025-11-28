@@ -1,5 +1,19 @@
+import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/signal.dart';
+
+// ============================================================================
+// Bit Flags
+// ============================================================================
+
+/// Bit flags for SignalImpl status.
+const int _signalDisposedBit = 1 << 0;
+const int _signalInBatchBit = 1 << 1;
+
+/// Bit flags for _ComputedImpl status.
+const int _computedDirtyBit = 1 << 0;
+const int _computedDisposedBit = 1 << 1;
+const int _computedRunningBit = 1 << 2;
 
 // ============================================================================
 // Global State
@@ -128,7 +142,7 @@ abstract class ReactiveSource {
 class SignalImpl<T> extends ReactiveSource implements Signal<T> {
   T _value;
 
-  /// Raw status flags: bit 0 = disposed, bit 1 = inBatch
+  /// Status flags: bit 0 = disposed, bit 1 = inBatch
   int _statusCode = 0;
 
   SignalImpl(this._value);
@@ -148,9 +162,8 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
     if (signals == null || signals.isEmpty) return;
 
     for (final signal in signals) {
-      signal._statusCode &= ~2; // Clear inBatch flag
-      if ((signal._statusCode & 1) == 0) {
-        // Not disposed
+      signal._statusCode = signal._statusCode.clearFlag(_signalInBatchBit);
+      if (!signal._statusCode.hasFlag(_signalDisposedBit)) {
         for (var node = signal._targets; node != null; node = node.nextTarget) {
           node.target._markDirty();
         }
@@ -170,8 +183,7 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
 
   @override
   set value(T newValue) {
-    // Check disposed (bit 0) or value unchanged
-    if ((_statusCode & 1) != 0 ||
+    if (_statusCode.hasFlag(_signalDisposedBit) ||
         identical(_value, newValue) ||
         _value == newValue) {
       return;
@@ -179,9 +191,8 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
     _value = newValue;
 
     if (_batchDepth > 0) {
-      // Check inBatch (bit 1)
-      if ((_statusCode & 2) == 0) {
-        _statusCode |= 2; // Set inBatch flag
+      if (!_statusCode.hasFlag(_signalInBatchBit)) {
+        _statusCode = _statusCode.setFlag(_signalInBatchBit);
         (_batchSignals ??= []).add(this);
       }
       return;
@@ -201,8 +212,8 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
 
   @override
   void dispose() {
-    if ((_statusCode & 1) != 0) return; // Already disposed
-    _statusCode |= 1; // Set disposed flag
+    if (_statusCode.hasFlag(_signalDisposedBit)) return;
+    _statusCode = _statusCode.setFlag(_signalDisposedBit);
     _targets = null;
     _node = null;
   }
@@ -217,7 +228,7 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   T? _value;
 
   /// Status flags: bit 0 = dirty, bit 1 = disposed, bit 2 = running
-  int _statusCode = 1; // Start dirty
+  int _statusCode = _computedDirtyBit; // Start dirty
 
   /// Tail of linked list of dependencies (sources).
   _Node? _sources;
@@ -228,19 +239,19 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   T get value {
     final status = _statusCode;
 
-    // Check for cycle (bit 2 = running)
-    if ((status & 4) != 0) {
+    // Check for cycle
+    if (status.hasFlag(_computedRunningBit)) {
       throw StateError('Cycle detected in computed');
     }
 
-    // Recompute if dirty (bit 0 = dirty)
-    if ((status & 1) != 0) {
+    // Recompute if dirty
+    if (status.hasFlag(_computedDirtyBit)) {
       _recompute();
     }
 
     // Track self as dependency (inline for performance)
-    // Skip if disposed (bit 1)
-    if ((status & 2) == 0) {
+    // Skip if disposed
+    if (!status.hasFlag(_computedDisposedBit)) {
       final targetComputed = _currentComputed;
       if (targetComputed != null && !identical(targetComputed, this)) {
         _addDependency(targetComputed);
@@ -252,8 +263,8 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
 
   @override
   void dispose() {
-    if ((_statusCode & 2) != 0) return; // Already disposed
-    _statusCode |= 2; // Set disposed flag
+    if (_statusCode.hasFlag(_computedDisposedBit)) return;
+    _statusCode = _statusCode.setFlag(_computedDisposedBit);
     _cleanupSources(disposeAll: true);
     _sources = null;
     _targets = null;
@@ -261,8 +272,9 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   }
 
   void _markDirty() {
-    if ((_statusCode & 3) != 0) return; // Already dirty or disposed
-    _statusCode |= 1; // Set dirty flag
+    // Already dirty or disposed
+    if (_statusCode.hasFlag(_computedDirtyBit | _computedDisposedBit)) return;
+    _statusCode = _statusCode.setFlag(_computedDirtyBit);
 
     // Propagate dirty flag to dependents
     for (var node = _targets; node != null; node = node.nextTarget) {
@@ -271,8 +283,8 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   }
 
   void _recompute() {
-    // Check if disposed (bit 1)
-    if ((_statusCode & 2) != 0) {
+    // Check if disposed
+    if (_statusCode.hasFlag(_computedDisposedBit)) {
       // Just compute without tracking
       final previousComputed = _currentComputed;
       try {
@@ -280,12 +292,12 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
       } finally {
         _currentComputed = previousComputed;
       }
-      _statusCode &= ~1; // Clear dirty flag
+      _statusCode = _statusCode.clearFlag(_computedDirtyBit);
       return;
     }
 
-    // Mark as running to detect cycles (bit 2)
-    _statusCode |= 4;
+    // Mark as running to detect cycles
+    _statusCode = _statusCode.setFlag(_computedRunningBit);
 
     // Prepare sources for reuse
     _prepareSources();
@@ -297,13 +309,13 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
       _value = _compute();
     } finally {
       _currentComputed = previousComputed;
-      _statusCode &= ~4; // Clear running flag
+      _statusCode = _statusCode.clearFlag(_computedRunningBit);
     }
 
     // Cleanup unused sources
     _cleanupSources();
 
-    _statusCode &= ~1; // Clear dirty flag
+    _statusCode = _statusCode.clearFlag(_computedDirtyBit);
   }
 
   /// Mark all source nodes as recyclable.
