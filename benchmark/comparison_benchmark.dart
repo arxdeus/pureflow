@@ -313,7 +313,11 @@ class PureFlowComputedChain extends BenchmarkBase {
   PureFlowComputedChain() : super('PureFlow Computed Chain');
 
   late pureflow.Signal<int> _source;
-  late pureflow.Computed<int> _c1, _c2, _c3, _c4, _c5;
+  late pureflow.Computed<int> _c1;
+  late pureflow.Computed<int> _c2;
+  late pureflow.Computed<int> _c3;
+  late pureflow.Computed<int> _c4;
+  late pureflow.Computed<int> _c5;
 
   @override
   void setup() {
@@ -348,7 +352,11 @@ class SignalsComputedChain extends BenchmarkBase {
   SignalsComputedChain() : super('Signals Computed Chain');
 
   late signals.Signal<int> _source;
-  late signals.Computed<int> _c1, _c2, _c3, _c4, _c5;
+  late signals.Computed<int> _c1;
+  late signals.Computed<int> _c2;
+  late signals.Computed<int> _c3;
+  late signals.Computed<int> _c4;
+  late signals.Computed<int> _c5;
 
   @override
   void setup() {
@@ -469,7 +477,9 @@ class PureFlowDiamond extends BenchmarkBase {
   PureFlowDiamond() : super('PureFlow Diamond');
 
   late pureflow.Signal<int> _source;
-  late pureflow.Computed<int> _left, _right, _bottom;
+  late pureflow.Computed<int> _left;
+  late pureflow.Computed<int> _right;
+  late pureflow.Computed<int> _bottom;
 
   @override
   void setup() {
@@ -500,7 +510,9 @@ class SignalsDiamond extends BenchmarkBase {
   SignalsDiamond() : super('Signals Diamond');
 
   late signals.Signal<int> _source;
-  late signals.Computed<int> _left, _right, _bottom;
+  late signals.Computed<int> _left;
+  late signals.Computed<int> _right;
+  late signals.Computed<int> _bottom;
 
   @override
   void setup() {

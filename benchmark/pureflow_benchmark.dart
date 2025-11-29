@@ -172,7 +172,11 @@ class ComputedReadsBenchmark extends BenchmarkBase {
 class ComputedChainBenchmark extends BenchmarkBase {
   static const int _updatesPerRun = 100;
   late Signal<int> _source;
-  late Computed<int> _c1, _c2, _c3, _c4, _c5;
+  late Computed<int> _c1;
+  late Computed<int> _c2;
+  late Computed<int> _c3;
+  late Computed<int> _c4;
+  late Computed<int> _c5;
 
   ComputedChainBenchmark() : super('Computed chain (5 deep)');
 
@@ -257,7 +261,9 @@ class BatchUpdatesBenchmark extends BenchmarkBase {
 class DiamondDependencyBenchmark extends BenchmarkBase {
   static const int _updatesPerRun = 100;
   late Signal<int> _source;
-  late Computed<int> _left, _right, _bottom;
+  late Computed<int> _left;
+  late Computed<int> _right;
+  late Computed<int> _bottom;
 
   DiamondDependencyBenchmark() : super('Diamond dependency');
 
