@@ -870,7 +870,14 @@ void main() {
       lastName.dispose();
       fullName.dispose();
     });
-
+    test('computed stream', () {
+      final c = Computed(() => 42);
+      final values = <int>[];
+      final sub = c.listen(values.add);
+      expect(values, [42]);
+      sub.cancel();
+      c.dispose();
+    });
     test('computed filtering list', () {
       final numbers = Signal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       final evens = Computed(
