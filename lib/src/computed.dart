@@ -5,7 +5,7 @@ import 'package:pureflow/src/impl.dart';
 /// Computed values are derived from signals and other computed values.
 /// They automatically track which signals they depend on by monitoring
 /// signal access during computation.
-abstract class Computed<T> {
+abstract class Computed<T> with Stream<T> {
   /// Creates a new computed value from a computation function.
   factory Computed(T Function() compute) => ComputedImpl<T>(compute);
 

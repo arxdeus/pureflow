@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/signal.dart';
+import 'package:synchronous_stream/synchronous_stream.dart';
 
 // ============================================================================
 // Bit Flags
@@ -28,9 +31,9 @@ List<SignalImpl<Object?>>? _batchSignals;
 // ============================================================================
 
 /// A linked list node for tracking dependencies between signals and computeds.
-class _Node {
+class _Node<T> {
   /// The source (Signal or Computed) that the target depends on.
-  ReactiveSource source;
+  ReactiveSource<T> source;
 
   /// The target (Computed) that depends on the source.
   _ComputedImpl<Object?> target;
@@ -40,15 +43,15 @@ class _Node {
   bool isActive = true;
 
   /// Links for the source's list of dependents (targets).
-  _Node? previousTarget;
-  _Node? nextTarget;
+  _Node<Object?>? previousTarget;
+  _Node<Object?>? nextTarget;
 
   /// Links for the target's list of dependencies (sources).
-  _Node? previousSource;
-  _Node? nextSource;
+  _Node<Object?>? previousSource;
+  _Node<Object?>? nextSource;
 
   /// Rollback node for context switching during evaluation.
-  _Node? rollbackNode;
+  _Node<Object?>? rollbackNode;
 
   _Node({required this.source, required this.target});
 }
@@ -59,15 +62,33 @@ class _Node {
 
 /// Abstract base class for reactive sources (Signal and Computed).
 /// Contains shared dependency tracking logic.
-abstract class ReactiveSource {
+abstract class ReactiveSource<T> with Stream<T> {
+  StreamController<T>? _$controller;
+  StreamController<T> get _controller =>
+      _$controller ??= SynchronousDispatchStreamController<T>.broadcast();
+
   /// Head of linked list of dependent computeds.
-  _Node? _targets;
+  _Node<Object?>? _targets;
 
   /// Current node being used during dependency tracking.
-  _Node? _node;
+  _Node<Object?>? _node;
+
+  @override
+  StreamSubscription<T> listen(
+    void Function(T event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) =>
+      _controller.stream.listen(
+        onData,
+        onError: onError,
+        onDone: onDone,
+        cancelOnError: cancelOnError,
+      );
 
   /// Subscribes a node to this source's target list.
-  void _subscribeNode(_Node node) {
+  void _subscribeNode(_Node<Object?> node) {
     if (_targets != node && node.previousTarget == null) {
       node.nextTarget = _targets;
       if (_targets != null) {
@@ -78,7 +99,7 @@ abstract class ReactiveSource {
   }
 
   /// Unsubscribes a node from this source's target list.
-  void _unsubscribeNode(_Node node) {
+  void _unsubscribeNode(_Node<Object?> node) {
     if (_targets == null) return;
 
     final previousNode = node.previousTarget;
@@ -139,7 +160,9 @@ abstract class ReactiveSource {
 // Signal Implementation
 // ============================================================================
 
-class SignalImpl<T> extends ReactiveSource implements Signal<T> {
+class SignalImpl<T> extends ReactiveSource<T>
+    with Stream<T>
+    implements Signal<T> {
   T _value;
 
   /// Status flags: bit 0 = disposed, bit 1 = inBatch
@@ -160,8 +183,19 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
   static void _flushBatch() {
     final signals = _batchSignals;
     if (signals == null || signals.isEmpty) return;
+    final length = signals.length;
 
-    for (final signal in signals) {
+    for (var index = 0; index < length; index++) {
+      final signal = signals[index];
+      signal._statusCode = signal._statusCode.clearFlag(_signalInBatchBit);
+      if (!signal._statusCode.hasFlag(_signalDisposedBit)) {
+        for (var node = signal._targets; node != null; node = node.nextTarget) {
+          node.target._markDirty();
+        }
+      }
+    }
+    for (var index = 0; index < length; index++) {
+      final signal = signals[index];
       signal._statusCode = signal._statusCode.clearFlag(_signalInBatchBit);
       if (!signal._statusCode.hasFlag(_signalDisposedBit)) {
         for (var node = signal._targets; node != null; node = node.nextTarget) {
@@ -189,7 +223,7 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
       return;
     }
     _value = newValue;
-
+    _$controller?.add(newValue);
     if (_batchDepth > 0) {
       if (!_statusCode.hasFlag(_signalInBatchBit)) {
         _statusCode = _statusCode.setFlag(_signalInBatchBit);
@@ -223,7 +257,7 @@ class SignalImpl<T> extends ReactiveSource implements Signal<T> {
 // Computed Implementation
 // ============================================================================
 
-class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
+class _ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   final T Function() _compute;
   T? _value;
 
@@ -231,7 +265,7 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   int _statusCode = _computedDirtyBit; // Start dirty
 
   /// Tail of linked list of dependencies (sources).
-  _Node? _sources;
+  _Node<Object?>? _sources;
 
   _ComputedImpl(this._compute);
 
@@ -336,7 +370,7 @@ class _ComputedImpl<T> extends ReactiveSource implements Computed<T> {
   /// Remove unused sources (those still inactive).
   void _cleanupSources({bool disposeAll = false}) {
     var node = _sources;
-    _Node? headNode;
+    _Node<Object?>? headNode;
 
     while (node != null) {
       final previousNode = node.previousSource;

@@ -1,7 +1,7 @@
 import 'package:pureflow/src/impl.dart';
 
 /// A reactive signal that holds a value and notifies listeners when it changes.
-abstract class Signal<T> {
+abstract class Signal<T> with Stream<T> {
   /// Creates a new Signal with an initial value.
   factory Signal(T value) => SignalImpl<T>(value);
 
