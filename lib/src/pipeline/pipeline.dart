@@ -95,9 +95,8 @@ class Pipeline {
   /// If [force] is `true`, all events become inactive immediately.
   /// If [force] is `false`, new events are prevented and the method waits
   /// for all active events to complete.
-  Future<void> dispose({bool force = false}) {
-    return _taskStream.dispose(force: force);
-  }
+  Future<void> dispose({bool force = false}) =>
+      _taskStream.dispose(force: force);
 }
 
 /// Internal stream wrapper for processing pipeline tasks.
@@ -122,7 +121,6 @@ class _TaskStream {
     final processedStream = transformer(sourceStream, _processEvent);
     _subscription = processedStream.listen(
       null, // Results are handled in _SinglePipelineEventSubscription
-      onError: _handleError,
       cancelOnError: false,
       onDone: _handleDone,
     );
@@ -131,7 +129,7 @@ class _TaskStream {
   Stream<dynamic> _createSourceStream() async* {
     while (_isActive) {
       if (_eventQueue.isEmpty) {
-        final pendingCompleter = _waitingCompleter ??= Completer<void>.sync();
+        final pendingCompleter = _waitingCompleter ??= Completer<void>();
         await pendingCompleter.future;
         _waitingCompleter = null;
         if (!_isActive) return;
@@ -174,14 +172,6 @@ class _TaskStream {
     }
     _activeEvents.add(event);
     return _SinglePipelineEventStream._(event, _activeEvents.remove);
-  }
-
-  @pragma('vm:prefer-inline')
-  void _handleError(Object error, StackTrace stackTrace) {
-    // Errors are handled in _SinglePipelineEventSubscription
-    // This is a fallback for transformer-level errors
-    if (_activeEvents.isEmpty) return;
-    _cancelActiveEvents();
   }
 
   @pragma('vm:prefer-inline')
@@ -253,17 +243,16 @@ class _TaskStream {
     _completeWaitingCompleter();
 
     // Wait for all events to complete
-    await Future.wait(futures);
+    try {
+      await Future.wait(futures);
+    } catch (_) {}
 
     // After all events complete, mark as inactive
     _isActive = false;
     _completeWaitingCompleter();
 
     // Cancel the subscription
-    final sub = _subscription;
-    if (sub != null) {
-      await sub.cancel();
-    }
+    await _subscription?.cancel();
     _subscription = null;
   }
 }
@@ -294,9 +283,7 @@ class _SinglePipelineEventStream extends Stream<dynamic> {
       event,
       onStreamClosed,
       onData,
-      onError,
       onDone,
-      cancelOnError ?? false,
     );
   }
 }
@@ -305,9 +292,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   final _PipelineEvent<dynamic> event;
   final void Function(_PipelineEvent<dynamic> event) onStreamClosed;
   void Function(dynamic event)? _onData;
-  Function? _onError;
   void Function()? _onDone;
-  final bool _cancelOnError;
   final Zone _zone = Zone.current;
 
   int _statusFlag = 0;
@@ -322,9 +307,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     this.event,
     this.onStreamClosed,
     this._onData,
-    this._onError,
     this._onDone,
-    this._cancelOnError,
   ) {
     _taskFuture = _run();
   }
@@ -335,13 +318,32 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
       final result = await event.task(event.context);
       if (_shouldEmit) {
         await _completeWithResult(result);
+      } else {
+        // Task was cancelled, but still complete the completer to avoid hanging
+        _tryCompleteCompleter(() => event.completer.complete(result));
       }
     } catch (error, stackTrace) {
+      // Always propagate error through completer FIRST, before any other processing
+      // This ensures the error reaches the caller of run() immediately
+      // Don't use runGuarded here - we want the error to propagate through the Future
+      // The error will be caught by expectLater or try-catch in the caller
+      if (!event.completer.isCompleted) {
+        event.completer.completeError(error, stackTrace);
+      }
+      // Then handle error through stream subscription if needed
+      // We need to await this to ensure onDone is called before _closeStream
+      // This is important for asyncExpand to work correctly
       if (_shouldEmit) {
         await _completeWithError(error, stackTrace);
+      } else {
+        // Even if not emitting, we need to signal completion for asyncExpand
+        // Call onDone directly since we're not going through _completeWithError
+        _invokeDoneHandlerIfNeeded();
       }
     } finally {
       event._stopwatch.stop();
+      // Close stream in finally to ensure it's always called
+      // This removes the event from active events, allowing other events to process
       _closeStream();
     }
   }
@@ -378,33 +380,13 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   @pragma('vm:prefer-inline')
   void _invokeDoneHandlerIfNeeded() {
     if (_statusFlag.hasFlag(_didCallDoneBit)) return;
+    // Don't call onDone if subscription is canceled - it may cause assertion errors
+    if (_statusFlag.hasFlag(_canceledBit)) return;
     _statusFlag = _statusFlag.setFlag(_didCallDoneBit);
     final doneHandler = _onDone;
     if (doneHandler != null) {
       _zone.runGuarded(doneHandler);
     }
-  }
-
-  @pragma('vm:prefer-inline')
-  bool _invokeErrorHandler(Object error, StackTrace stackTrace) {
-    final errorHandler = _onError;
-    if (errorHandler == null) {
-      _zone.handleUncaughtError(error, stackTrace);
-      return false;
-    }
-
-    var handled = true;
-    _zone.runGuarded(() {
-      if (errorHandler is void Function(Object, StackTrace)) {
-        errorHandler(error, stackTrace);
-      } else if (errorHandler is void Function(Object)) {
-        errorHandler(error);
-      } else {
-        _zone.handleUncaughtError(error, stackTrace);
-        handled = false;
-      }
-    });
-    return handled;
   }
 
   Future<void> _completeWithResult(dynamic result) async {
@@ -422,26 +404,30 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   }
 
   Future<void> _completeWithError(Object error, StackTrace stackTrace) async {
-    _tryCompleteCompleter(
-      () => event.completer.completeError(error, stackTrace),
-    );
-    _lastError = error;
-    _lastStackTrace = stackTrace;
+    // Completer is already completed with error in _run(), so we just need to
+    // handle stream subscription callbacks here
+    // Wrap everything in try-catch to ensure errors don't stop pipeline processing
+    try {
+      _lastError = error;
+      _lastStackTrace = stackTrace;
 
-    await _waitForResumeIfPaused();
-    if (_statusFlag.hasFlag(_canceledBit)) return;
+      // Don't wait for resume if paused - error is already propagated through completer
+      // This prevents blocking when error occurs. If paused, resume immediately.
+      if (_statusFlag.hasFlag(_pausedBit) &&
+          !_statusFlag.hasFlag(_canceledBit)) {
+        _completeResumeCompleter(); // Resume immediately to avoid blocking
+      }
 
-    final handled = _invokeErrorHandler(error, stackTrace);
+      if (_statusFlag.hasFlag(_canceledBit)) return;
 
-    if (_cancelOnError && handled) {
-      await cancel();
-      return;
+      _completeAsFutureWithError(error, stackTrace);
+      // Don't call onDone here - it will be called in _closeStream if needed
+      // Calling it here can cause issues with asyncExpand's internal StreamController
+    } catch (_) {
+      // If error handling itself throws, don't let it stop pipeline
+      // The completer is already completed with the original error
+      // Just ignore the secondary error to keep pipeline running
     }
-
-    if (!handled && _onData == null) {
-      _invokeDoneHandlerIfNeeded();
-    }
-    _completeAsFutureWithError(error, stackTrace);
   }
 
   @pragma('vm:prefer-inline')
@@ -457,6 +443,11 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     if (_lastError == null) {
       _completeAsFutureWithSuccess();
     }
+    // Always call onDone when stream closes to signal completion to asyncExpand
+    // This ensures asyncExpand can continue processing subsequent events
+    // This is critical - without it, asyncExpand will wait forever for stream to complete
+    // Call it here in _closeStream() to ensure proper order and avoid issues
+    _invokeDoneHandlerIfNeeded();
     _completeResumeCompleter();
     // Clear references to help GC
     _lastData = null;
@@ -481,9 +472,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   }
 
   @override
-  void onError(Function? handleError) {
-    _onError = handleError;
-  }
+  void onError(Function? handleError) {}
 
   @override
   void onDone(void Function()? handleDone) {

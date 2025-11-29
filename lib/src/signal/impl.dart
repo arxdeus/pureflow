@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/computed.dart';
-import 'package:pureflow/src/signal.dart';
+import 'package:pureflow/src/signal/computed.dart';
+import 'package:pureflow/src/signal/signal.dart';
 import 'package:synchronous_stream/synchronous_stream.dart';
 
 // ============================================================================
@@ -259,7 +259,7 @@ class SignalImpl<T> extends ReactiveSource<T>
 
 class _ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   final T Function() _compute;
-  T? _value;
+  late T _value;
 
   /// Status flags: bit 0 = dirty, bit 1 = disposed, bit 2 = running
   int _statusCode = _computedDirtyBit; // Start dirty
@@ -268,6 +268,26 @@ class _ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   _Node<Object?>? _sources;
 
   _ComputedImpl(this._compute);
+
+  @override
+  StreamSubscription<T> listen(
+    void Function(T event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    final stream = _controller.stream;
+    // Trigger initial computation to establish dependencies
+    if (_statusCode.hasFlag(_computedDirtyBit)) {
+      _recompute();
+    }
+    return stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
 
   @override
   T get value {
@@ -292,7 +312,7 @@ class _ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
       }
     }
 
-    return _value as T;
+    return _value;
   }
 
   @override
@@ -323,6 +343,7 @@ class _ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
       final previousComputed = _currentComputed;
       try {
         _value = _compute();
+        _$controller?.add(_value);
       } finally {
         _currentComputed = previousComputed;
       }
@@ -341,6 +362,7 @@ class _ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
 
     try {
       _value = _compute();
+      _$controller?.add(_value);
     } finally {
       _currentComputed = previousComputed;
       _statusCode = _statusCode.clearFlag(_computedRunningBit);

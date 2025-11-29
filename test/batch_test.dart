@@ -1,4 +1,5 @@
 import 'package:pureflow/pureflow.dart';
+import 'package:pureflow/src/listenable/listenable.dart';
 import 'package:test/test.dart';
 
 void main() {

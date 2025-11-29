@@ -1,4 +1,4 @@
-import 'package:pureflow/src/impl.dart';
+import 'package:pureflow/src/signal/impl.dart';
 
 /// A computed value that automatically tracks its dependencies.
 ///

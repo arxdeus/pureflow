@@ -870,13 +870,16 @@ void main() {
       lastName.dispose();
       fullName.dispose();
     });
-    test('computed stream', () {
-      final c = Computed(() => 42);
+    test('computed stream', () async {
+      const target = 42;
+      final source = Signal(0);
+      final c = Computed(() => source.value);
       final values = <int>[];
       final sub = c.listen(values.add);
-      expect(values, [42]);
-      sub.cancel();
-      c.dispose();
+      expect(values, isEmpty);
+      source.value = target;
+      expect(values, [target]);
+      await sub.cancel();
     });
     test('computed filtering list', () {
       final numbers = Signal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);

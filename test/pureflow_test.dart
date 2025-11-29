@@ -3,6 +3,18 @@ import 'package:test/test.dart';
 
 void main() {
   group('Signal', () {
+    test('signal stream', () {
+      final s = Signal(0);
+      final values = <int>[];
+      final sub = s.listen(values.add);
+      s.value = 1;
+      expect(values, [1]);
+      s.value = 2;
+      expect(values, [1, 2]);
+      sub.cancel();
+      s.dispose();
+    });
+
     test('basic read/write', () {
       final s = Signal(0);
       expect(s.value, 0);
