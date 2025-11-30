@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 
@@ -23,17 +24,17 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     final viewStatus = _viewStatus;
 
     // Check for cycle (running bit set) - inline
-    if ((viewStatus & runningBit) != 0) {
+    if (viewStatus.hasFlag(runningBit)) {
       throw StateError('Cycle detected in Computed computation');
     }
 
     // Recompute if dirty - inline
-    if ((viewStatus & dirtyBit) != 0) {
+    if (viewStatus.hasFlag(dirtyBit)) {
       _recompute();
     }
 
     // Track self as dependency if inside another Computed and not disposed
-    if ((viewStatus & viewDisposedBit) == 0) {
+    if (!viewStatus.hasFlag(viewDisposedBit)) {
       final targetView = currentView;
       if (targetView != null && !identical(targetView, this)) {
         trackDependency(targetView);
@@ -49,8 +50,8 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   void markDirty() {
     final viewStatus = _viewStatus;
     // Already dirty or disposed - skip (inline combined check)
-    if ((viewStatus & (dirtyBit | viewDisposedBit)) != 0) return;
-    _viewStatus = viewStatus | dirtyBit;
+    if (viewStatus.hasFlag(dirtyBit | viewDisposedBit)) return;
+    _viewStatus = viewStatus.setFlag(dirtyBit);
 
     // Notify all subscribers (listeners + dependent Computed values)
     notifySubscribers();
@@ -60,14 +61,14 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     final viewStatus = _viewStatus;
 
     // If disposed, just compute without tracking - inline
-    if ((viewStatus & viewDisposedBit) != 0) {
+    if (viewStatus.hasFlag(viewDisposedBit)) {
       _value = _compute();
-      _viewStatus = viewStatus & ~dirtyBit;
+      _viewStatus = viewStatus.clearFlag(dirtyBit);
       return;
     }
 
     // Mark as running - inline
-    _viewStatus = viewStatus | runningBit;
+    _viewStatus = viewStatus.setFlag(runningBit);
 
     // Prepare existing dependencies for reuse
     _prepareDependencies();
@@ -81,7 +82,7 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
       currentView = previousView;
       // Always cleanup dependencies and clear flags, even on error
       _cleanupDependencies();
-      _viewStatus = _viewStatus & ~(dirtyBit | runningBit);
+      _viewStatus = _viewStatus.clearFlag(dirtyBit | runningBit);
     }
   }
 
@@ -147,7 +148,7 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     bool? cancelOnError,
   }) {
     // Trigger initial computation to establish dependencies - inline
-    if ((_viewStatus & dirtyBit) != 0) {
+    if (_viewStatus.hasFlag(dirtyBit)) {
       _recompute();
     }
     return ReactiveSubscription<T>(this, onData, onDone);
@@ -156,8 +157,8 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   @override
   void dispose() {
     // Inline bit check
-    if ((_viewStatus & viewDisposedBit) != 0) return;
-    _viewStatus = _viewStatus | viewDisposedBit;
+    if (_viewStatus.hasFlag(viewDisposedBit)) return;
+    _viewStatus = _viewStatus.setFlag(viewDisposedBit);
     _cleanupDependencies(disposeAll: true);
     sourceDeps = null;
     super.dispose();
@@ -167,10 +168,10 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   String toString() {
     final viewStatus = _viewStatus;
     // Inline bit checks
-    if ((viewStatus & viewDisposedBit) != 0) {
+    if (viewStatus.hasFlag(viewDisposedBit)) {
       return 'Computed<$T>(disposed)';
     }
-    if ((viewStatus & dirtyBit) != 0) {
+    if (viewStatus.hasFlag(dirtyBit)) {
       return 'Computed<$T>(dirty)';
     }
     return 'Computed<$T>($_value)';

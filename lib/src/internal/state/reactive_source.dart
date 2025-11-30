@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
+import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/interfaces.dart';
 import 'package:pureflow/src/internal/state/dependency_node.dart';
 import 'package:pureflow/src/internal/state/globals.dart';
@@ -180,8 +181,8 @@ abstract class ReactiveSource<T> extends Stream<T>
   @pragma('vm:prefer-inline')
   void notifySubscribers() {
     // Guard against recursive notification (inline bit check)
-    if ((status & notifyingBit) != 0) return;
-    status = status | notifyingBit;
+    if (status.hasFlag(notifyingBit)) return;
+    status = status.setFlag(notifyingBit);
 
     // Notify callback listeners
     for (var node = listeners; node != null; node = node.next) {
@@ -192,7 +193,7 @@ abstract class ReactiveSource<T> extends Stream<T>
       node.target.markDirty();
     }
 
-    status = status & ~notifyingBit;
+    status = status.clearFlag(notifyingBit);
   }
 
   // --------------------------------------------------------------------------
@@ -218,8 +219,8 @@ abstract class ReactiveSource<T> extends Stream<T>
   @mustCallSuper
   void dispose() {
     // Inline bit check
-    if ((status & disposedBit) != 0) return;
-    status = status | disposedBit;
+    if (status.hasFlag(disposedBit)) return;
+    status = status.setFlag(disposedBit);
     listeners = null;
     dependencies = null;
     trackingNode = null;

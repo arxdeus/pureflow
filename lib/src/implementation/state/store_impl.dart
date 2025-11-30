@@ -1,3 +1,4 @@
+import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 import 'package:pureflow/src/store.dart';
 
@@ -29,7 +30,7 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
     // Fastest check first: reference equality
     if (identical(_value, newValue)) return;
     // Then disposed check (cheap bit operation)
-    if ((status & disposedBit) != 0) return;
+    if (status.hasFlag(disposedBit)) return;
     // Finally value equality (potentially expensive)
     if (_value == newValue) return;
 
@@ -82,7 +83,7 @@ void flushBatch() {
   for (var i = 0; i < count; i++) {
     final signal = batchBuffer[i]! as StoreImpl<Object?>;
     signal._inBatch = false;
-    if ((signal.status & disposedBit) == 0) {
+    if (!signal.status.hasFlag(disposedBit)) {
       signal.notifySubscribers();
     }
     batchBuffer[i] = null; // Avoid memory leak

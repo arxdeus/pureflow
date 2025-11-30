@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
+import 'package:pureflow/src/common/bit_flags.dart';
+import 'package:pureflow/src/common/synchronous_future.dart';
 import 'package:pureflow/src/interfaces.dart';
 import 'package:pureflow/src/internal/state/globals.dart';
 
@@ -28,7 +30,7 @@ class ReactiveSubscription<T> implements StreamSubscription<T> {
   )   : _onData = onData,
         _onDone = onDone {
     // Check if source is already disposed - inline
-    if ((_source.status & disposedBit) != 0) {
+    if (_source.status.hasFlag(disposedBit)) {
       _onSourceDisposed();
       return;
     }
@@ -65,7 +67,7 @@ class ReactiveSubscription<T> implements StreamSubscription<T> {
       _source.removeListener(_listener);
       _onDone?.call();
     }
-    return Future<void>.value();
+    return const SynchronousFuture<void>(null);
   }
 
   @override
