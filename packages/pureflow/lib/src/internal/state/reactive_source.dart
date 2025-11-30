@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
-import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/interfaces.dart';
-import 'package:pureflow/src/internal/state/dependency_node.dart';
-import 'package:pureflow/src/internal/state/globals.dart';
-import 'package:pureflow/src/internal/state/listener_node.dart';
-import 'package:pureflow/src/internal/state/reactive_subscription.dart';
+import '../../common/bit_flags.dart';
+import '../../interfaces.dart';
+import 'dependency_node.dart';
+import 'globals.dart';
+import 'listener_node.dart';
+import 'reactive_subscription.dart';
 
 export 'dependency_node.dart';
 export 'globals.dart';

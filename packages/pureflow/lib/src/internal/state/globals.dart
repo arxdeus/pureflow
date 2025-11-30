@@ -2,7 +2,7 @@
 // Bit Flags for Status
 // ============================================================================
 
-import 'package:pureflow/src/internal/state/reactive_source.dart';
+import 'reactive_source.dart';
 
 /// Bit flags for ReactiveSource status.
 const int disposedBit = 1 << 0;

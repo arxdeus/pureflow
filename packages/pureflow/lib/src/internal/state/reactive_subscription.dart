@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
-import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/common/synchronous_future.dart';
-import 'package:pureflow/src/interfaces.dart';
-import 'package:pureflow/src/internal/state/globals.dart';
+import '../../common/bit_flags.dart';
+import '../../common/synchronous_future.dart';
+import '../../interfaces.dart';
+import 'globals.dart';
 
 /// Interface for reactive sources used by ReactiveSubscription.
 @internal

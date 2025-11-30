@@ -1,7 +1,6 @@
-import 'package:pureflow/src/implementation/pipeline/pipeline.dart';
+import 'implementation/pipeline/pipeline.dart';
 
-export 'package:pureflow/src/implementation/pipeline/pipeline.dart'
-    show PipelineEventContext;
+export 'implementation/pipeline/pipeline.dart' show PipelineEventContext;
 
 /// A function that transforms a stream of events using a processing function.
 ///

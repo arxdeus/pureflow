@@ -8,7 +8,7 @@ library;
 import 'dart:async';
 import 'dart:math';
 
-import 'package:pureflow/pureflow.dart';
+import '../packages/pureflow/lib/pureflow.dart';
 
 // ============================================================================
 // Common Types

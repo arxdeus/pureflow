@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
-import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/common/synchronous_future.dart';
+import '../../common/bit_flags.dart';
+import '../../common/synchronous_future.dart';
 
-import 'package:pureflow/src/implementation/pipeline/pipeline_event_context.dart';
+import '../../implementation/pipeline/pipeline_event_context.dart';
 
 /// Bit flags for pipeline event status.
 const int canceledBit = 1 << 0;

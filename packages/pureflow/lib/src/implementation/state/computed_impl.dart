@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/computed.dart';
-import 'package:pureflow/src/internal/state/reactive_source.dart';
+import '../../common/bit_flags.dart';
+import '../../computed.dart';
+import '../../internal/state/reactive_source.dart';
 
 // ============================================================================
 // ComputedImpl - Optimized Implementation with bit flags

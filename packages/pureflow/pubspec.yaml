@@ -1,5 +1,5 @@
-name: pureflow_flutter
-description: Flutter integration for the PureFlow reactive library
+name: pureflow
+description: A lightweight, fast, and type-safe reactive state management library for Dart.
 version: 1.0.0
 repository: https://github.com/arxdeus/pureflow
 homepage: https://github.com/arxdeus/pureflow
@@ -16,9 +16,7 @@ topics:
 
 environment:
   sdk: ^3.5.0
-  flutter: ">=1.17.0"
 
 dependencies:
-  pureflow: any
-  flutter:
-    sdk: flutter
+  meta: ^1.17.0
+  synchronous_stream: ^1.0.2

@@ -60,4 +60,5 @@
 /// - Direct delegation to PureFlow's listener system
 library;
 
+export 'package:pureflow/pureflow.dart';
 export 'src/adapters.dart' show ValueUnitFlutterX, ValueUnitListenable;

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:pureflow/src/internal/pipeline/task_stream.dart';
+import '../../internal/pipeline/task_stream.dart';
 
 /// Context object passed to pipeline tasks providing access to cancellation state.
 ///

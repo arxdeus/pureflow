@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:pureflow/src/internal/pipeline/task_stream.dart';
-import 'package:pureflow/src/pipeline.dart';
+import '../../internal/pipeline/task_stream.dart';
+import '../../pipeline.dart';
 
 export 'pipeline_event_context.dart' show PipelineEventContext;
 

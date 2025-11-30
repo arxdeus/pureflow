@@ -1,5 +1,5 @@
 import 'package:benchmark_harness/benchmark_harness.dart';
-import 'package:pureflow/pureflow.dart' as pureflow;
+import '../packages/pureflow/lib/pureflow.dart' as pureflow;
 import 'package:signals_core/signals_core.dart' as signals;
 import 'value_notifier/listenable.dart' as listenable;
 

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/common/synchronous_future.dart';
+import '../packages/pureflow/lib/src/common/bit_flags.dart';
+import '../packages/pureflow/lib/src/common/synchronous_future.dart';
 
 /// Direct comparison benchmark: async* generator vs custom Stream implementation
 
