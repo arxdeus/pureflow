@@ -74,9 +74,23 @@ counter.value = 1; // No notification - same value
 counter.value = 2; // Notification triggered
 ```
 
+You can provide a custom equality function for advanced use cases:
+
+```dart
+// Deep list comparison
+final items = Store<List<int>>([1, 2, 3],
+  equality: (a, b) => listequality(a,b),
+);
+
+// Custom object comparison
+final user = Store<User>(User(name: 'Alice'),
+  equality: (a, b) => a.name == b.name && a.id == b.id,
+);
+```
+
 #### Stream Support
 
-Every `Store` is also a `Stream`, making it compatible with `StreamBuilder` and other stream-based APIs:
+Every `Store` and `Computed` is also a `Stream`, making it compatible with `StreamBuilder` and other stream-based APIs:
 
 ```dart
 final name = Store<String>('Alice');
@@ -135,6 +149,23 @@ print(sum.value); // 30
 
 items.value = [1, 2, 3];
 print(sum.value); // 12 (both doubled and sum recomputed)
+```
+
+#### Custom Equality in Computed
+
+You can provide a custom equality function to prevent notifications when the computed value hasn't actually changed:
+
+```dart
+final items = Store<List<int>>([1, 2, 3]);
+
+// Without custom equality: creates new list each time, triggers notifications
+final filtered = Computed(() => items.value.where((x) => x > 0).toList());
+
+// With custom equality: only notifies if list contents actually changed
+final filteredWithequality = Computed(
+  () => items.value.where((x) => x > 0).toList(),
+  equality: (a, b) => listequality(a, b),
+);
 ```
 
 #### Conditional Dependencies
@@ -327,14 +358,10 @@ class AuthenticationController {
       _isLoading.value = true;
 
       try {
-        await Future.delayed(Duration(seconds: 2));
-
-        if (!context.isActive) {
-          throw StateError('Login cancelled');
-        }
-
         final user = await api.login(email, password);
-
+        if (!context.isActive) {
+          return;
+        }
         // Update state atomically
         Store.batch(() {
           _user.value = user;
@@ -379,7 +406,7 @@ PureFlow is engineered for maximum performance:
 | **Pooled Nodes** | Reduced GC pressure |
 | **Batch Updates** | Minimize notification overhead |
 
-In benchmarks, PureFlow outperforms `signals_core` across all operations.
+In benchmarks, PureFlow outperforms popular packages almost across all operations.
 
 ---
 
@@ -391,7 +418,6 @@ The `pureflow_flutter` package provides seamless integration with Flutter's widg
 
 ```yaml
 dependencies:
-  pureflow: ^1.0.0
   pureflow_flutter: ^1.0.0
 ```
 
@@ -449,7 +475,7 @@ ValueListenableBuilder<String>(
 
 The `ValueUnitListenable` adapter is designed for maximum efficiency:
 
-- **No allocation per access** — Instances are cached using `Expando`
+- **No allocation per access** — Instances are cached and bound using `Expando`
 - **Direct delegation** — All operations forward to PureFlow's listener system
 - **Cached instances** — Same source always returns the same adapter
 
@@ -466,7 +492,7 @@ print(identical(store.asListenable, store.asListenable)); // true
 
 | Member | Description |
 |--------|-------------|
-| `Store(T value)` | Create a new store with initial value |
+| `Store(T value, {equality?})` | Create a new store with initial value and optional custom equality |
 | `T value` | Get or set the current value |
 | `update(T Function(T))` | Update value using a function |
 | `addListener(VoidCallback)` | Register a change listener |
@@ -474,33 +500,6 @@ print(identical(store.asListenable, store.asListenable)); // true
 | `listen(void Function(T))` | Subscribe as a stream |
 | `dispose()` | Release resources |
 | `static batch<R>(R Function())` | Batch multiple updates |
-
-### Computed<T>
-
-| Member | Description |
-|--------|-------------|
-| `Computed(T Function())` | Create computed from function |
-| `T value` | Get current (possibly recomputed) value |
-| `addListener(VoidCallback)` | Register a change listener |
-| `removeListener(VoidCallback)` | Remove a change listener |
-| `listen(void Function(T))` | Subscribe as a stream |
-| `dispose()` | Release resources |
-
-### Pipeline
-
-| Member | Description |
-|--------|-------------|
-| `Pipeline({transformer})` | Create pipeline with concurrency strategy |
-| `Future<R> run<R>(task)` | Execute async task through pipeline |
-| `Future<void> dispose({force})` | Shutdown pipeline |
-
-### PipelineEventContext
-
-| Member | Description |
-|--------|-------------|
-| `bool isActive` | Whether task should continue |
-
----
 
 ## License
 

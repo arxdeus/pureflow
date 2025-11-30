@@ -93,6 +93,10 @@ abstract class Computed<T> implements ReactiveValueHolder<T> {
   /// - [compute]: A function that computes and returns the derived value.
   ///   Any `Store` or [Computed] values accessed during this function's
   ///   execution are automatically tracked as dependencies.
+  /// - [equality]: Optional custom equality function. If provided, this function
+  ///   will be used to compare the newly computed value with the previous value.
+  ///   If the values are equal, no notifications will be sent to listeners.
+  ///   The function should return `true` if the two values are considered equal.
   ///
   /// ## Example
   /// ```dart
@@ -102,6 +106,13 @@ abstract class Computed<T> implements ReactiveValueHolder<T> {
   /// final totalPrice = Computed(() {
   ///   return price.value * (1 + taxRate.value);
   /// });
+  ///
+  /// // With custom equality for list comparison
+  /// final filtered = Computed(
+  ///   () => items.value.where((x) => x > 0).toList(),
+  ///   equality: (a, b) => a.length == b.length &&
+  ///                     a.every((e) => b.contains(e)),
+  /// );
   /// ```
   ///
   /// ## Pure Functions
@@ -115,7 +126,8 @@ abstract class Computed<T> implements ReactiveValueHolder<T> {
   /// If [compute] throws an exception, it will propagate to the caller of
   /// [value]. The computed remains in a dirty state and will re-execute
   /// on the next access.
-  factory Computed(T Function() compute) = ComputedImpl<T>;
+  factory Computed(T Function() compute, {bool Function(T, T)? equality}) =>
+      ComputedImpl<T>(compute, equality: equality);
 
   /// The current computed value.
   ///

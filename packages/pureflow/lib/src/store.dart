@@ -77,14 +77,23 @@ abstract class Store<T> implements ReactiveValueHolder<T> {
   ///
   /// ## Parameters
   /// - [value]: The initial value to store.
+  /// - [equality]: Optional custom equality function. If provided, this function
+  ///   will be used instead of the default equality check (`identical()` and `==`).
+  ///   The function should return `true` if the two values are considered equal.
   ///
   /// ## Example
   /// ```dart
   /// final counter = Store<int>(0);
   /// final user = Store<User?>(null);
   /// final items = Store<List<String>>([]);
+  ///
+  /// // With custom equality for deep list comparison
+  /// final listStore = Store<List<int>>([1, 2, 3],
+  ///   equality: (a, b) => a.length == b.length && a.every((e) => b.contains(e)),
+  /// );
   /// ```
-  factory Store(T value) = StoreImpl<T>;
+  factory Store(T value, {bool Function(T, T)? equality}) =>
+      StoreImpl<T>(value, equality: equality);
 
   /// Runs a function within a batch context, deferring all notifications.
   ///
@@ -163,11 +172,13 @@ abstract class Store<T> implements ReactiveValueHolder<T> {
   ///
   /// ## Equality Checking
   ///
-  /// To avoid unnecessary notifications, the setter performs two checks:
-  /// 1. `identical(oldValue, newValue)` - fast reference equality
-  /// 2. `oldValue == newValue` - value equality (for immutable objects)
+  /// To avoid unnecessary notifications, the setter performs equality checks:
+  /// - If a custom `equality` function was provided to the constructor, it is used
+  /// - Otherwise, two checks are performed:
+  ///   1. `identical(oldValue, newValue)` - fast reference equality
+  ///   2. `oldValue == newValue` - value equality (for immutable objects)
   ///
-  /// If either check returns true, no notification is sent.
+  /// If the equality check returns true, no notification is sent.
   ///
   /// ## Example
   /// ```dart

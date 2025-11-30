@@ -1,4 +1,6 @@
+import 'package:meta/meta.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
+import 'package:pureflow/src/common/equality.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 import 'package:pureflow/src/store.dart';
 
@@ -8,10 +10,12 @@ import 'package:pureflow/src/store.dart';
 
 /// Implementation of [Store].
 class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
-  StoreImpl(this._value);
+  StoreImpl(this._value, {bool Function(T, T)? equality})
+      : _equality = equality;
 
   T _value;
   bool _inBatch = false;
+  final bool Function(T, T)? _equality;
 
   @override
   @pragma('vm:prefer-inline')
@@ -27,12 +31,11 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   @override
   @pragma('vm:prefer-inline')
   set value(T newValue) {
-    // Fastest check first: reference equality
-    if (identical(_value, newValue)) return;
-    // Then disposed check (cheap bit operation)
+    // Disposed check first (cheap bit operation)
     if (status.hasFlag(disposedBit)) return;
-    // Finally value equality (potentially expensive)
-    if (_value == newValue) return;
+
+    // Optimized inline equality check
+    if (checkEquality(_value, newValue, _equality)) return;
 
     _value = newValue;
 
@@ -66,6 +69,8 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
 // ============================================================================
 
 /// Runs a function within a batch context.
+@internal
+@pragma('vm:prefer-inline')
 R runBatch<R>(R Function() action) {
   batchDepth++;
   try {
@@ -75,6 +80,7 @@ R runBatch<R>(R Function() action) {
   }
 }
 
+@internal
 @pragma('vm:prefer-inline')
 void flushBatch() {
   final count = batchCount;

@@ -1,8 +1,13 @@
 import 'dart:async';
 
 import 'package:pureflow/src/common/bit_flags.dart';
+import 'package:pureflow/src/common/equality.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
+
+// ============================================================================
+// Equality Check Helpers (Inline for Performance)
+// ============================================================================
 
 // ============================================================================
 // ComputedImpl - Optimized Implementation with bit flags
@@ -10,10 +15,13 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 
 /// Implementation of [Computed].
 class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
-  ComputedImpl(this._compute);
+  ComputedImpl(this._compute, {bool Function(T, T)? equality})
+      : _equality = equality;
 
   final T Function() _compute;
+  final bool Function(T, T)? _equality;
   late T _value;
+  bool _hasValue = false; // Track if we have a computed value
 
   /// Status flags: bit 0 = dirty, bit 1 = running, bit 2 = disposed
   int _viewStatus = dirtyBit; // Start dirty
@@ -76,13 +84,29 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     final previousView = currentView;
     currentView = this;
 
+    late final T newValue;
     try {
-      _value = _compute();
+      newValue = _compute();
     } finally {
       currentView = previousView;
       // Always cleanup dependencies and clear flags, even on error
       _cleanupDependencies();
       _viewStatus = _viewStatus.clearFlag(dirtyBit | runningBit);
+    }
+
+    // Check equality: if values are equal, don't notify subscribers
+    // On first computation (_hasValue is false), always notify
+    // Optimized inline equality check
+    final shouldNotify =
+        !_hasValue || !checkEquality(_value, newValue, _equality);
+
+    // Only notify if value actually changed
+    if (shouldNotify) {
+      if (!_hasValue) _hasValue = true;
+
+      _value = newValue;
+
+      notifySubscribers();
     }
   }
 
