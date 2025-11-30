@@ -23,13 +23,13 @@ const int _viewDisposedBit = 1 << 2;
 // ============================================================================
 
 /// Currently evaluating CompositeView (for dependency tracking).
-CompositeUnit<Object?>? _currentView;
+Computed<Object?>? _currentView;
 
 /// Current batch depth for batched updates.
 int _batchDepth = 0;
 
 /// Pre-allocated batch buffer for better performance.
-final List<ValueUnit<Object?>?> _batchBuffer =
+final List<Store<Object?>?> _batchBuffer =
     List.filled(64, null, growable: true);
 int _batchCount = 0;
 
@@ -46,7 +46,7 @@ class _DependencyNode {
   _ReactiveSource<Object?> source;
 
   /// Target CompositeView that depends on the source.
-  CompositeUnit<Object?> target;
+  Computed<Object?> target;
 
   /// Whether this dependency is still active (false = recyclable).
   bool isActive = true;
@@ -73,7 +73,7 @@ class _DependencyNode {
 @pragma('vm:prefer-inline')
 _DependencyNode _acquireNode(
   _ReactiveSource<Object?> source,
-  CompositeUnit<Object?> target,
+  Computed<Object?> target,
 ) {
   final pooled = _nodePool;
   if (pooled != null) {
@@ -255,7 +255,7 @@ abstract class _ReactiveSource<T> extends Stream<T> implements ValueHolder<T> {
 
   /// Registers this source as a dependency of the given CompositeView.
   @pragma('vm:prefer-inline')
-  void _trackDependency(CompositeUnit<Object?> targetView) {
+  void _trackDependency(Computed<Object?> targetView) {
     final node = _trackingNode;
 
     // Fast path: existing active node for this target
@@ -284,7 +284,7 @@ abstract class _ReactiveSource<T> extends Stream<T> implements ValueHolder<T> {
   /// Slow path for creating new dependencies.
   @pragma('vm:never-inline')
   void _trackDependencySlow(
-    CompositeUnit<Object?> targetView,
+    Computed<Object?> targetView,
     _DependencyNode? oldNode,
   ) {
     // New dependency - acquire node from pool and link to target's source list
@@ -458,8 +458,8 @@ class _ReactiveSubscription<T> implements StreamSubscription<T> {
 ///
 /// Uses optimized subscription system for both callback listeners
 /// and reactive dependencies.
-class ValueUnit<T> extends _ReactiveSource<T> {
-  ValueUnit(this._value);
+class Store<T> extends _ReactiveSource<T> {
+  Store(this._value);
 
   T _value;
   bool _inBatch = false;
@@ -548,8 +548,8 @@ class ValueUnit<T> extends _ReactiveSource<T> {
 ///
 /// CompositeView lazily recomputes its value when dependencies change.
 /// Uses optimized subscription system with bit flags for status.
-class CompositeUnit<T> extends _ReactiveSource<T> {
-  CompositeUnit(this._compute);
+class Computed<T> extends _ReactiveSource<T> {
+  Computed(this._compute);
 
   final T Function() _compute;
   late T _value;
@@ -615,7 +615,7 @@ class CompositeUnit<T> extends _ReactiveSource<T> {
     _prepareDependencies();
 
     final previousView = _currentView;
-    _currentView = this as CompositeUnit<Object?>;
+    _currentView = this as Computed<Object?>;
 
     try {
       _value = _compute();
@@ -725,8 +725,8 @@ class CompositeUnit<T> extends _ReactiveSource<T> {
 
 void main() {
   print('=== Basic Signal/Computed Test ===');
-  final signal = ValueUnit(0);
-  final computed = CompositeUnit(() => signal.value * 2);
+  final signal = Store(0);
+  final computed = Computed(() => signal.value * 2);
 
   print('Initial: signal=${signal.value}, computed=${computed.value}');
 
@@ -737,10 +737,10 @@ void main() {
   print('After signal=5: computed=${computed.value}');
 
   print('\n=== Chained Computed Test ===');
-  final a = ValueUnit(1);
-  final b = ValueUnit(2);
-  final sum = CompositeUnit(() => a.value + b.value);
-  final doubled = CompositeUnit(() => sum.value * 2);
+  final a = Store(1);
+  final b = Store(2);
+  final sum = Computed(() => a.value + b.value);
+  final doubled = Computed(() => sum.value * 2);
 
   print(
       'a=${a.value}, b=${b.value}, sum=${sum.value}, doubled=${doubled.value}');
@@ -750,8 +750,8 @@ void main() {
 
   print('\n=== Batch Test ===');
   var notifyCount = 0;
-  final x = ValueUnit(0);
-  final y = CompositeUnit(() {
+  final x = Store(0);
+  final y = Computed(() {
     notifyCount++;
     return x.value * 10;
   });
@@ -760,7 +760,7 @@ void main() {
   y.value;
   notifyCount = 0;
 
-  ValueUnit.batch(() {
+  Store.batch(() {
     x.value = 1;
     x.value = 2;
     x.value = 3;
@@ -770,17 +770,17 @@ void main() {
   print('Recompute count during batch: $notifyCount (should be 1)');
 
   print('\n=== Listener Test ===');
-  final count = ValueUnit(0);
+  final count = Store(0);
   count.addListener(() => print('  Listener called: ${count.value}'));
   count.value = 1;
   count.value = 2;
 
   print('\n=== Dynamic Dependency Test ===');
-  final condition = ValueUnit(true);
-  final valA = ValueUnit(10);
-  final valB = ValueUnit(20);
+  final condition = Store(true);
+  final valA = Store(10);
+  final valB = Store(20);
   var computeCount = 0;
-  final dynamic_ = CompositeUnit(() {
+  final dynamic_ = Computed(() {
     computeCount++;
     return condition.value ? valA.value : valB.value;
   });

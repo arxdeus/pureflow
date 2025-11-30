@@ -27,7 +27,7 @@ void main() {
 
 class SignalCreationBenchmark extends BenchmarkBase {
   static const int _batchSize = 1000;
-  late List<ValueUnit<int>> _signals;
+  late List<Store<int>> _signals;
 
   SignalCreationBenchmark() : super('Signal creation');
 
@@ -39,7 +39,7 @@ class SignalCreationBenchmark extends BenchmarkBase {
   @override
   void run() {
     for (var i = 0; i < _batchSize; i++) {
-      _signals.add(ValueUnit(i));
+      _signals.add(Store(i));
     }
   }
 
@@ -54,14 +54,14 @@ class SignalCreationBenchmark extends BenchmarkBase {
 
 class SignalReadsBenchmark extends BenchmarkBase {
   static const int _readsPerRun = 1000;
-  late ValueUnit<int> _signal;
+  late Store<int> _signal;
   int _sum = 0;
 
   SignalReadsBenchmark() : super('Signal reads');
 
   @override
   void setup() {
-    _signal = ValueUnit(42);
+    _signal = Store(42);
     _sum = 0;
   }
 
@@ -82,13 +82,13 @@ class SignalReadsBenchmark extends BenchmarkBase {
 
 class SignalWritesBenchmark extends BenchmarkBase {
   static const int _writesPerRun = 1000;
-  late ValueUnit<int> _signal;
+  late Store<int> _signal;
 
   SignalWritesBenchmark() : super('Signal writes');
 
   @override
   void setup() {
-    _signal = ValueUnit(0);
+    _signal = Store(0);
   }
 
   @override
@@ -110,21 +110,21 @@ class SignalWritesBenchmark extends BenchmarkBase {
 
 class ComputedCreationBenchmark extends BenchmarkBase {
   static const int _batchSize = 100;
-  late ValueUnit<int> _source;
-  late List<CompositeUnit<int>> _computeds;
+  late Store<int> _source;
+  late List<Computed<int>> _computeds;
 
   ComputedCreationBenchmark() : super('Computed creation');
 
   @override
   void setup() {
-    _source = ValueUnit(1);
+    _source = Store(1);
     _computeds = [];
   }
 
   @override
   void run() {
     for (var i = 0; i < _batchSize; i++) {
-      _computeds.add(CompositeUnit(() => _source.value * 2));
+      _computeds.add(Computed(() => _source.value * 2));
     }
   }
 
@@ -140,16 +140,16 @@ class ComputedCreationBenchmark extends BenchmarkBase {
 
 class ComputedReadsBenchmark extends BenchmarkBase {
   static const int _readsPerRun = 1000;
-  late ValueUnit<int> _signal;
-  late CompositeUnit<int> _computed;
+  late Store<int> _signal;
+  late Computed<int> _computed;
   int _sum = 0;
 
   ComputedReadsBenchmark() : super('Computed reads (cached)');
 
   @override
   void setup() {
-    _signal = ValueUnit(10);
-    _computed = CompositeUnit(() => _signal.value * 2);
+    _signal = Store(10);
+    _computed = Computed(() => _signal.value * 2);
     _sum = 0;
   }
 
@@ -171,23 +171,23 @@ class ComputedReadsBenchmark extends BenchmarkBase {
 
 class ComputedChainBenchmark extends BenchmarkBase {
   static const int _updatesPerRun = 100;
-  late ValueUnit<int> _source;
-  late CompositeUnit<int> _c1;
-  late CompositeUnit<int> _c2;
-  late CompositeUnit<int> _c3;
-  late CompositeUnit<int> _c4;
-  late CompositeUnit<int> _c5;
+  late Store<int> _source;
+  late Computed<int> _c1;
+  late Computed<int> _c2;
+  late Computed<int> _c3;
+  late Computed<int> _c4;
+  late Computed<int> _c5;
 
   ComputedChainBenchmark() : super('Computed chain (5 deep)');
 
   @override
   void setup() {
-    _source = ValueUnit(1);
-    _c1 = CompositeUnit(() => _source.value + 1);
-    _c2 = CompositeUnit(() => _c1.value + 1);
-    _c3 = CompositeUnit(() => _c2.value + 1);
-    _c4 = CompositeUnit(() => _c3.value + 1);
-    _c5 = CompositeUnit(() => _c4.value + 1);
+    _source = Store(1);
+    _c1 = Computed(() => _source.value + 1);
+    _c2 = Computed(() => _c1.value + 1);
+    _c3 = Computed(() => _c2.value + 1);
+    _c4 = Computed(() => _c3.value + 1);
+    _c5 = Computed(() => _c4.value + 1);
   }
 
   @override
@@ -216,15 +216,15 @@ class ComputedChainBenchmark extends BenchmarkBase {
 class BatchUpdatesBenchmark extends BenchmarkBase {
   static const int _updatesPerRun = 100;
   static const int _signalCount = 10;
-  late List<ValueUnit<int>> _signals;
-  late CompositeUnit<int> _sum;
+  late List<Store<int>> _signals;
+  late Computed<int> _sum;
 
   BatchUpdatesBenchmark() : super('Batch updates (10 signals)');
 
   @override
   void setup() {
-    _signals = List.generate(_signalCount, ValueUnit.new);
-    _sum = CompositeUnit(() {
+    _signals = List.generate(_signalCount, Store.new);
+    _sum = Computed(() {
       var total = 0;
       for (final s in _signals) {
         total += s.value;
@@ -236,7 +236,7 @@ class BatchUpdatesBenchmark extends BenchmarkBase {
   @override
   void run() {
     for (var i = 0; i < _updatesPerRun; i++) {
-      ValueUnit.batch(() {
+      Store.batch(() {
         for (var j = 0; j < _signalCount; j++) {
           _signals[j].value = i + j;
         }
@@ -260,10 +260,10 @@ class BatchUpdatesBenchmark extends BenchmarkBase {
 
 class DiamondDependencyBenchmark extends BenchmarkBase {
   static const int _updatesPerRun = 100;
-  late ValueUnit<int> _source;
-  late CompositeUnit<int> _left;
-  late CompositeUnit<int> _right;
-  late CompositeUnit<int> _bottom;
+  late Store<int> _source;
+  late Computed<int> _left;
+  late Computed<int> _right;
+  late Computed<int> _bottom;
 
   DiamondDependencyBenchmark() : super('Diamond dependency');
 
@@ -274,10 +274,10 @@ class DiamondDependencyBenchmark extends BenchmarkBase {
     //  left    right
     //    \      /
     //     bottom
-    _source = ValueUnit(1);
-    _left = CompositeUnit(() => _source.value + 1);
-    _right = CompositeUnit(() => _source.value + 2);
-    _bottom = CompositeUnit(() => _left.value + _right.value);
+    _source = Store(1);
+    _left = Computed(() => _source.value + 1);
+    _right = Computed(() => _source.value + 2);
+    _bottom = Computed(() => _left.value + _right.value);
   }
 
   @override
@@ -300,17 +300,17 @@ class DiamondDependencyBenchmark extends BenchmarkBase {
 class ManyDependentsBenchmark extends BenchmarkBase {
   static const int _updatesPerRun = 10;
   static const int _dependentCount = 100;
-  late ValueUnit<int> _source;
-  late List<CompositeUnit<int>> _computeds;
+  late Store<int> _source;
+  late List<Computed<int>> _computeds;
 
   ManyDependentsBenchmark() : super('Many dependents (100)');
 
   @override
   void setup() {
-    _source = ValueUnit(0);
+    _source = Store(0);
     _computeds = List.generate(
       _dependentCount,
-      (i) => CompositeUnit(() => _source.value + i),
+      (i) => Computed(() => _source.value + i),
     );
   }
 
@@ -340,7 +340,7 @@ class ManyDependentsBenchmark extends BenchmarkBase {
 
 class MemoryEfficiencyBenchmark extends BenchmarkBase {
   static const int _signalCount = 1000;
-  late List<ValueUnit<int>> _signals;
+  late List<Store<int>> _signals;
   int _sum = 0;
 
   MemoryEfficiencyBenchmark() : super('Signals w/o deps');
@@ -348,7 +348,7 @@ class MemoryEfficiencyBenchmark extends BenchmarkBase {
   @override
   void setup() {
     // Create signals without dependents (should use minimal memory)
-    _signals = List.generate(_signalCount, ValueUnit.new);
+    _signals = List.generate(_signalCount, Store.new);
     _sum = 0;
   }
 

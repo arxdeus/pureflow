@@ -85,11 +85,11 @@ void _runComparison(
 class PureFlowSignalCreation extends BenchmarkBase {
   PureFlowSignalCreation() : super('PureFlow Signal Creation');
 
-  late List<pureflow.ValueUnit<int>> _signals;
+  late List<pureflow.Store<int>> _signals;
 
   @override
   void run() {
-    _signals = List.generate(1000, pureflow.ValueUnit.new);
+    _signals = List.generate(1000, pureflow.Store.new);
   }
 
   @override
@@ -125,11 +125,11 @@ class ValueNotifierCreation extends BenchmarkBase {
 class PureFlowSignalReads extends BenchmarkBase {
   PureFlowSignalReads() : super('PureFlow Signal Reads');
 
-  late pureflow.ValueUnit<int> _signal;
+  late pureflow.Store<int> _signal;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(42);
+    _signal = pureflow.Store(42);
   }
 
   @override
@@ -179,11 +179,11 @@ class ValueNotifierReads extends BenchmarkBase {
 class PureFlowSignalWrites extends BenchmarkBase {
   PureFlowSignalWrites() : super('PureFlow Signal Writes');
 
-  late pureflow.ValueUnit<int> _signal;
+  late pureflow.Store<int> _signal;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(0);
+    _signal = pureflow.Store(0);
   }
 
   @override
@@ -230,13 +230,13 @@ class PureFlowSignalWritesWithListener extends BenchmarkBase {
   PureFlowSignalWritesWithListener()
       : super('PureFlow Signal Writes + Listener');
 
-  late pureflow.ValueUnit<int> _signal;
-  late pureflow.CompositeUnit<int> _computed;
+  late pureflow.Store<int> _signal;
+  late pureflow.Computed<int> _computed;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(0);
-    _computed = pureflow.CompositeUnit(() => _signal.value * 2);
+    _signal = pureflow.Store(0);
+    _computed = pureflow.Computed(() => _signal.value * 2);
   }
 
   @override
@@ -292,15 +292,15 @@ class ValueNotifierWritesWithListener extends BenchmarkBase {
 class PureFlowSignalWritesWith10Listeners extends BenchmarkBase {
   PureFlowSignalWritesWith10Listeners() : super('PureFlow 10 Listeners');
 
-  late pureflow.ValueUnit<int> _signal;
-  late List<pureflow.CompositeUnit<int>> _computeds;
+  late pureflow.Store<int> _signal;
+  late List<pureflow.Computed<int>> _computeds;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(0);
+    _signal = pureflow.Store(0);
     _computeds = List.generate(
       10,
-      (i) => pureflow.CompositeUnit(() => _signal.value * (i + 1)),
+      (i) => pureflow.Computed(() => _signal.value * (i + 1)),
     );
   }
 
@@ -372,13 +372,13 @@ class ValueNotifierWritesWith10Listeners extends BenchmarkBase {
 class PureFlowComputedReads extends BenchmarkBase {
   PureFlowComputedReads() : super('PureFlow Computed Reads');
 
-  late pureflow.ValueUnit<int> _signal;
-  late pureflow.CompositeUnit<int> _computed;
+  late pureflow.Store<int> _signal;
+  late pureflow.Computed<int> _computed;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(10);
-    _computed = pureflow.CompositeUnit(() => _signal.value * 2);
+    _signal = pureflow.Store(10);
+    _computed = pureflow.Computed(() => _signal.value * 2);
     // Warm up to cache the value
     final _ = _computed.value;
   }
@@ -438,21 +438,21 @@ class ValueNotifierComputedReads extends BenchmarkBase {
 class PureFlowComputedChain extends BenchmarkBase {
   PureFlowComputedChain() : super('PureFlow Computed Chain');
 
-  late pureflow.ValueUnit<int> _source;
-  late pureflow.CompositeUnit<int> _c1;
-  late pureflow.CompositeUnit<int> _c2;
-  late pureflow.CompositeUnit<int> _c3;
-  late pureflow.CompositeUnit<int> _c4;
-  late pureflow.CompositeUnit<int> _c5;
+  late pureflow.Store<int> _source;
+  late pureflow.Computed<int> _c1;
+  late pureflow.Computed<int> _c2;
+  late pureflow.Computed<int> _c3;
+  late pureflow.Computed<int> _c4;
+  late pureflow.Computed<int> _c5;
 
   @override
   void setup() {
-    _source = pureflow.ValueUnit(1);
-    _c1 = pureflow.CompositeUnit(() => _source.value + 1);
-    _c2 = pureflow.CompositeUnit(() => _c1.value + 1);
-    _c3 = pureflow.CompositeUnit(() => _c2.value + 1);
-    _c4 = pureflow.CompositeUnit(() => _c3.value + 1);
-    _c5 = pureflow.CompositeUnit(() => _c4.value + 1);
+    _source = pureflow.Store(1);
+    _c1 = pureflow.Computed(() => _source.value + 1);
+    _c2 = pureflow.Computed(() => _c1.value + 1);
+    _c3 = pureflow.Computed(() => _c2.value + 1);
+    _c4 = pureflow.Computed(() => _c3.value + 1);
+    _c5 = pureflow.Computed(() => _c4.value + 1);
   }
 
   @override
@@ -541,10 +541,10 @@ class ValueNotifierComputedChain extends BenchmarkBase {
 class PureFlowDiamond extends BenchmarkBase {
   PureFlowDiamond() : super('PureFlow Diamond');
 
-  late pureflow.ValueUnit<int> _source;
-  late pureflow.CompositeUnit<int> _left;
-  late pureflow.CompositeUnit<int> _right;
-  late pureflow.CompositeUnit<int> _bottom;
+  late pureflow.Store<int> _source;
+  late pureflow.Computed<int> _left;
+  late pureflow.Computed<int> _right;
+  late pureflow.Computed<int> _bottom;
 
   @override
   void setup() {
@@ -553,10 +553,10 @@ class PureFlowDiamond extends BenchmarkBase {
     //  left    right
     //    \      /
     //     bottom
-    _source = pureflow.ValueUnit(1);
-    _left = pureflow.CompositeUnit(() => _source.value + 1);
-    _right = pureflow.CompositeUnit(() => _source.value + 2);
-    _bottom = pureflow.CompositeUnit(() => _left.value + _right.value);
+    _source = pureflow.Store(1);
+    _left = pureflow.Computed(() => _source.value + 1);
+    _right = pureflow.Computed(() => _source.value + 2);
+    _bottom = pureflow.Computed(() => _left.value + _right.value);
   }
 
   @override
@@ -638,15 +638,15 @@ class ValueNotifierDiamond extends BenchmarkBase {
 class PureFlowManyListeners extends BenchmarkBase {
   PureFlowManyListeners() : super('PureFlow Many Listeners');
 
-  late pureflow.ValueUnit<int> _source;
-  late List<pureflow.CompositeUnit<int>> _computeds;
+  late pureflow.Store<int> _source;
+  late List<pureflow.Computed<int>> _computeds;
 
   @override
   void setup() {
-    _source = pureflow.ValueUnit(0);
+    _source = pureflow.Store(0);
     _computeds = List.generate(
       100,
-      (i) => pureflow.CompositeUnit(() => _source.value + i),
+      (i) => pureflow.Computed(() => _source.value + i),
     );
   }
 

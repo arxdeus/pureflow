@@ -52,11 +52,11 @@ void _runComparison(
 class PureFlowSignalCreation extends BenchmarkBase {
   PureFlowSignalCreation() : super('PureFlow Signal Creation');
 
-  late List<pureflow.ValueUnit<int>> _signals;
+  late List<pureflow.Store<int>> _signals;
 
   @override
   void run() {
-    _signals = List.generate(1000, pureflow.ValueUnit.new);
+    _signals = List.generate(1000, pureflow.Store.new);
   }
 
   @override
@@ -92,11 +92,11 @@ class SignalsSignalCreation extends BenchmarkBase {
 class PureFlowSignalReads extends BenchmarkBase {
   PureFlowSignalReads() : super('PureFlow Signal Reads');
 
-  late pureflow.ValueUnit<int> _signal;
+  late pureflow.Store<int> _signal;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(42);
+    _signal = pureflow.Store(42);
   }
 
   @override
@@ -146,11 +146,11 @@ class SignalsSignalReads extends BenchmarkBase {
 class PureFlowSignalWrites extends BenchmarkBase {
   PureFlowSignalWrites() : super('PureFlow Signal Writes');
 
-  late pureflow.ValueUnit<int> _signal;
+  late pureflow.Store<int> _signal;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(0);
+    _signal = pureflow.Store(0);
   }
 
   @override
@@ -196,18 +196,18 @@ class SignalsSignalWrites extends BenchmarkBase {
 class PureFlowComputedCreation extends BenchmarkBase {
   PureFlowComputedCreation() : super('PureFlow Computed Creation');
 
-  late pureflow.ValueUnit<int> _source;
-  late List<pureflow.CompositeUnit<int>> _computeds;
+  late pureflow.Store<int> _source;
+  late List<pureflow.Computed<int>> _computeds;
 
   @override
   void setup() {
-    _source = pureflow.ValueUnit(1);
+    _source = pureflow.Store(1);
   }
 
   @override
   void run() {
     _computeds =
-        List.generate(1000, (_) => pureflow.CompositeUnit(() => _source.value * 2));
+        List.generate(1000, (_) => pureflow.Computed(() => _source.value * 2));
   }
 
   @override
@@ -252,13 +252,13 @@ class SignalsComputedCreation extends BenchmarkBase {
 class PureFlowComputedReads extends BenchmarkBase {
   PureFlowComputedReads() : super('PureFlow Computed Reads');
 
-  late pureflow.ValueUnit<int> _signal;
-  late pureflow.CompositeUnit<int> _computed;
+  late pureflow.Store<int> _signal;
+  late pureflow.Computed<int> _computed;
 
   @override
   void setup() {
-    _signal = pureflow.ValueUnit(10);
-    _computed = pureflow.CompositeUnit(() => _signal.value * 2);
+    _signal = pureflow.Store(10);
+    _computed = pureflow.Computed(() => _signal.value * 2);
   }
 
   @override
@@ -312,21 +312,21 @@ class SignalsComputedReads extends BenchmarkBase {
 class PureFlowComputedChain extends BenchmarkBase {
   PureFlowComputedChain() : super('PureFlow Computed Chain');
 
-  late pureflow.ValueUnit<int> _source;
-  late pureflow.CompositeUnit<int> _c1;
-  late pureflow.CompositeUnit<int> _c2;
-  late pureflow.CompositeUnit<int> _c3;
-  late pureflow.CompositeUnit<int> _c4;
-  late pureflow.CompositeUnit<int> _c5;
+  late pureflow.Store<int> _source;
+  late pureflow.Computed<int> _c1;
+  late pureflow.Computed<int> _c2;
+  late pureflow.Computed<int> _c3;
+  late pureflow.Computed<int> _c4;
+  late pureflow.Computed<int> _c5;
 
   @override
   void setup() {
-    _source = pureflow.ValueUnit(1);
-    _c1 = pureflow.CompositeUnit(() => _source.value + 1);
-    _c2 = pureflow.CompositeUnit(() => _c1.value + 1);
-    _c3 = pureflow.CompositeUnit(() => _c2.value + 1);
-    _c4 = pureflow.CompositeUnit(() => _c3.value + 1);
-    _c5 = pureflow.CompositeUnit(() => _c4.value + 1);
+    _source = pureflow.Store(1);
+    _c1 = pureflow.Computed(() => _source.value + 1);
+    _c2 = pureflow.Computed(() => _c1.value + 1);
+    _c3 = pureflow.Computed(() => _c2.value + 1);
+    _c4 = pureflow.Computed(() => _c3.value + 1);
+    _c5 = pureflow.Computed(() => _c4.value + 1);
   }
 
   @override
@@ -394,13 +394,13 @@ class SignalsComputedChain extends BenchmarkBase {
 class PureFlowBatch extends BenchmarkBase {
   PureFlowBatch() : super('PureFlow Batch');
 
-  late List<pureflow.ValueUnit<int>> _signals;
-  late pureflow.CompositeUnit<int> _sum;
+  late List<pureflow.Store<int>> _signals;
+  late pureflow.Computed<int> _sum;
 
   @override
   void setup() {
-    _signals = List.generate(10, pureflow.ValueUnit.new);
-    _sum = pureflow.CompositeUnit(() {
+    _signals = List.generate(10, pureflow.Store.new);
+    _sum = pureflow.Computed(() {
       var total = 0;
       for (final s in _signals) {
         total += s.value;
@@ -412,7 +412,7 @@ class PureFlowBatch extends BenchmarkBase {
   @override
   void run() {
     for (var i = 0; i < 1000; i++) {
-      pureflow.ValueUnit.batch(() {
+      pureflow.Store.batch(() {
         for (var j = 0; j < 10; j++) {
           _signals[j].value = i + j;
         }
@@ -476,17 +476,17 @@ class SignalsBatch extends BenchmarkBase {
 class PureFlowDiamond extends BenchmarkBase {
   PureFlowDiamond() : super('PureFlow Diamond');
 
-  late pureflow.ValueUnit<int> _source;
-  late pureflow.CompositeUnit<int> _left;
-  late pureflow.CompositeUnit<int> _right;
-  late pureflow.CompositeUnit<int> _bottom;
+  late pureflow.Store<int> _source;
+  late pureflow.Computed<int> _left;
+  late pureflow.Computed<int> _right;
+  late pureflow.Computed<int> _bottom;
 
   @override
   void setup() {
-    _source = pureflow.ValueUnit(1);
-    _left = pureflow.CompositeUnit(() => _source.value + 1);
-    _right = pureflow.CompositeUnit(() => _source.value + 2);
-    _bottom = pureflow.CompositeUnit(() => _left.value + _right.value);
+    _source = pureflow.Store(1);
+    _left = pureflow.Computed(() => _source.value + 1);
+    _right = pureflow.Computed(() => _source.value + 2);
+    _bottom = pureflow.Computed(() => _left.value + _right.value);
   }
 
   @override
@@ -546,14 +546,14 @@ class SignalsDiamond extends BenchmarkBase {
 class PureFlowManyDependents extends BenchmarkBase {
   PureFlowManyDependents() : super('PureFlow Many Dependents');
 
-  late pureflow.ValueUnit<int> _source;
-  late List<pureflow.CompositeUnit<int>> _computeds;
+  late pureflow.Store<int> _source;
+  late List<pureflow.Computed<int>> _computeds;
 
   @override
   void setup() {
-    _source = pureflow.ValueUnit(0);
+    _source = pureflow.Store(0);
     _computeds =
-        List.generate(100, (i) => pureflow.CompositeUnit(() => _source.value + i));
+        List.generate(100, (i) => pureflow.Computed(() => _source.value + i));
   }
 
   @override
