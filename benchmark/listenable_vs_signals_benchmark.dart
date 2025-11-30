@@ -3,9 +3,9 @@ import 'package:pureflow/pureflow.dart' as pureflow;
 import 'package:signals_core/signals_core.dart' as signals;
 import 'value_notifier/listenable.dart' as listenable;
 
-/// Comparison benchmark: Listenable vs PureFlow vs signals_core
+/// Comparison benchmark: Listenable vs Pureflow vs signals_core
 void main() {
-  print('Listenable vs PureFlow vs signals_core - Performance Comparison');
+  print('Listenable vs Pureflow vs signals_core - Performance Comparison');
   print('Using benchmark_harness (10 iterations, 2s warmup)\n');
   print('=' * 120);
 
@@ -81,7 +81,7 @@ void _runComparison(
   // Find the winner
   final times = {
     'Listenable': listenableUs,
-    'PureFlow': pureflowUs,
+    'Pureflow': pureflowUs,
     'signals': signalsUs
   };
   final sorted = times.entries.toList()
@@ -93,7 +93,7 @@ void _runComparison(
   print(
     '${name.padRight(22)} '
     'Listenable: ${listenableUs.toStringAsFixed(1).padLeft(8)} μs  '
-    'PureFlow: ${pureflowUs.toStringAsFixed(1).padLeft(8)} μs  '
+    'Pureflow: ${pureflowUs.toStringAsFixed(1).padLeft(8)} μs  '
     'signals: ${signalsUs.toStringAsFixed(1).padLeft(8)} μs  '
     '[$winner wins, ${diff.toStringAsFixed(1)}x vs slowest]',
   );
@@ -122,7 +122,7 @@ class ListenableCreation extends BenchmarkBase {
 }
 
 class PureFlowCreation extends BenchmarkBase {
-  PureFlowCreation() : super('PureFlow Creation');
+  PureFlowCreation() : super('Pureflow Creation');
 
   late List<pureflow.Store<int>> _signals;
 
@@ -187,7 +187,7 @@ class ListenableReads extends BenchmarkBase {
 }
 
 class PureFlowReads extends BenchmarkBase {
-  PureFlowReads() : super('PureFlow Reads');
+  PureFlowReads() : super('Pureflow Reads');
 
   late pureflow.Store<int> _signal;
 
@@ -264,7 +264,7 @@ class ListenableWrites extends BenchmarkBase {
 }
 
 class PureFlowWrites extends BenchmarkBase {
-  PureFlowWrites() : super('PureFlow Writes');
+  PureFlowWrites() : super('Pureflow Writes');
 
   late pureflow.Store<int> _signal;
 
@@ -345,7 +345,7 @@ class ListenableWritesWithListener extends BenchmarkBase {
 }
 
 class PureFlowWritesWithListener extends BenchmarkBase {
-  PureFlowWritesWithListener() : super('PureFlow Writes + Listener');
+  PureFlowWritesWithListener() : super('Pureflow Writes + Listener');
 
   late pureflow.Store<int> _signal;
   late pureflow.Computed<int> _computed;
@@ -445,7 +445,7 @@ class ListenableWritesWith10Listeners extends BenchmarkBase {
 }
 
 class PureFlowWritesWith10Listeners extends BenchmarkBase {
-  PureFlowWritesWith10Listeners() : super('PureFlow 10 Listeners');
+  PureFlowWritesWith10Listeners() : super('Pureflow 10 Listeners');
 
   late pureflow.Store<int> _signal;
   late List<pureflow.Computed<int>> _computeds;
@@ -549,7 +549,7 @@ class ListenableComputedReads extends BenchmarkBase {
 }
 
 class PureFlowComputedReads extends BenchmarkBase {
-  PureFlowComputedReads() : super('PureFlow Computed Reads');
+  PureFlowComputedReads() : super('Pureflow Computed Reads');
 
   late pureflow.Store<int> _signal;
   late pureflow.Computed<int> _computed;
@@ -673,7 +673,7 @@ class ListenableComputedChain extends BenchmarkBase {
 }
 
 class PureFlowComputedChain extends BenchmarkBase {
-  PureFlowComputedChain() : super('PureFlow Computed Chain');
+  PureFlowComputedChain() : super('Pureflow Computed Chain');
 
   late pureflow.Store<int> _source;
   late pureflow.Computed<int> _c1;
@@ -810,7 +810,7 @@ class ListenableDiamond extends BenchmarkBase {
 }
 
 class PureFlowDiamond extends BenchmarkBase {
-  PureFlowDiamond() : super('PureFlow Diamond');
+  PureFlowDiamond() : super('Pureflow Diamond');
 
   late pureflow.Store<int> _source;
   late pureflow.Computed<int> _left;
@@ -932,7 +932,7 @@ class ListenableManyListeners extends BenchmarkBase {
 }
 
 class PureFlowManyListeners extends BenchmarkBase {
-  PureFlowManyListeners() : super('PureFlow Many Listeners');
+  PureFlowManyListeners() : super('Pureflow Many Listeners');
 
   late pureflow.Store<int> _source;
   late List<pureflow.Computed<int>> _computeds;

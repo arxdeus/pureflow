@@ -2,9 +2,9 @@ import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:pureflow/pureflow.dart' as pureflow;
 import 'package:signals_core/signals_core.dart' as signals;
 
-/// Comparison benchmark: PureFlow vs signals_core (pub.dev)
+/// Comparison benchmark: Pureflow vs signals_core (pub.dev)
 void main() {
-  print('PureFlow vs signals_core - Performance Comparison');
+  print('Pureflow vs signals_core - Performance Comparison');
   print('Using benchmark_harness (10 iterations, 2s warmup)\n');
   print('=' * 85);
 
@@ -34,12 +34,12 @@ void _runComparison(
   final signalsUs = signalsLib.measure();
 
   final ratio = signalsUs / pureUs;
-  final winner = ratio > 1 ? 'PureFlow' : 'signals';
+  final winner = ratio > 1 ? 'Pureflow' : 'signals';
   final diff = ratio > 1 ? ratio : 1 / ratio;
 
   print(
     '${name.padRight(20)} '
-    'PureFlow: ${pureUs.toStringAsFixed(2).padLeft(10)} μs  '
+    'Pureflow: ${pureUs.toStringAsFixed(2).padLeft(10)} μs  '
     'signals: ${signalsUs.toStringAsFixed(2).padLeft(10)} μs  '
     '[$winner ${diff.toStringAsFixed(1)}x faster]',
   );
@@ -50,7 +50,7 @@ void _runComparison(
 // ============================================================================
 
 class PureFlowSignalCreation extends BenchmarkBase {
-  PureFlowSignalCreation() : super('PureFlow Signal Creation');
+  PureFlowSignalCreation() : super('Pureflow Signal Creation');
 
   late List<pureflow.Store<int>> _signals;
 
@@ -90,7 +90,7 @@ class SignalsSignalCreation extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowSignalReads extends BenchmarkBase {
-  PureFlowSignalReads() : super('PureFlow Signal Reads');
+  PureFlowSignalReads() : super('Pureflow Signal Reads');
 
   late pureflow.Store<int> _signal;
 
@@ -144,7 +144,7 @@ class SignalsSignalReads extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowSignalWrites extends BenchmarkBase {
-  PureFlowSignalWrites() : super('PureFlow Signal Writes');
+  PureFlowSignalWrites() : super('Pureflow Signal Writes');
 
   late pureflow.Store<int> _signal;
 
@@ -194,7 +194,7 @@ class SignalsSignalWrites extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowComputedCreation extends BenchmarkBase {
-  PureFlowComputedCreation() : super('PureFlow Computed Creation');
+  PureFlowComputedCreation() : super('Pureflow Computed Creation');
 
   late pureflow.Store<int> _source;
   late List<pureflow.Computed<int>> _computeds;
@@ -250,7 +250,7 @@ class SignalsComputedCreation extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowComputedReads extends BenchmarkBase {
-  PureFlowComputedReads() : super('PureFlow Computed Reads');
+  PureFlowComputedReads() : super('Pureflow Computed Reads');
 
   late pureflow.Store<int> _signal;
   late pureflow.Computed<int> _computed;
@@ -310,7 +310,7 @@ class SignalsComputedReads extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowComputedChain extends BenchmarkBase {
-  PureFlowComputedChain() : super('PureFlow Computed Chain');
+  PureFlowComputedChain() : super('Pureflow Computed Chain');
 
   late pureflow.Store<int> _source;
   late pureflow.Computed<int> _c1;
@@ -392,7 +392,7 @@ class SignalsComputedChain extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowBatch extends BenchmarkBase {
-  PureFlowBatch() : super('PureFlow Batch');
+  PureFlowBatch() : super('Pureflow Batch');
 
   late List<pureflow.Store<int>> _signals;
   late pureflow.Computed<int> _sum;
@@ -474,7 +474,7 @@ class SignalsBatch extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowDiamond extends BenchmarkBase {
-  PureFlowDiamond() : super('PureFlow Diamond');
+  PureFlowDiamond() : super('Pureflow Diamond');
 
   late pureflow.Store<int> _source;
   late pureflow.Computed<int> _left;
@@ -544,7 +544,7 @@ class SignalsDiamond extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowManyDependents extends BenchmarkBase {
-  PureFlowManyDependents() : super('PureFlow Many Dependents');
+  PureFlowManyDependents() : super('Pureflow Many Dependents');
 
   late pureflow.Store<int> _source;
   late List<pureflow.Computed<int>> _computeds;

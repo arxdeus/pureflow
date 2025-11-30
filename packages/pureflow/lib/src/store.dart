@@ -8,7 +8,7 @@ import 'package:pureflow/src/interfaces.dart';
 /// A reactive signal that holds a single mutable value.
 ///
 /// [Store] is the fundamental building block for reactive state management
-/// in PureFlow. It wraps a value of type [T] and automatically notifies
+/// in Pureflow. It wraps a value of type [T] and automatically notifies
 /// all listeners and dependent `Computed` values when the value changes.
 ///
 /// ## Features

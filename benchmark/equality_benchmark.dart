@@ -3,7 +3,7 @@ import 'package:pureflow/pureflow.dart';
 
 /// Benchmark suite to test the performance impact of equality checking in Computed.
 void main() {
-  print('PureFlow - Equality Performance Benchmark\n');
+  print('Pureflow - Equality Performance Benchmark\n');
   print('=' * 70);
   print('Testing the performance impact of equality checking in Computed\n');
   print('=' * 70);

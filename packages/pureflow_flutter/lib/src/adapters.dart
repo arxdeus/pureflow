@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:pureflow/pureflow.dart' as pureflow;
 
-/// A zero-allocation adapter that exposes a PureFlow `ValueHolder` as a Flutter
+/// A zero-allocation adapter that exposes a Pureflow `ValueHolder` as a Flutter
 /// [ValueListenable].
 ///
-/// This adapter enables seamless integration between PureFlow's reactive system
+/// This adapter enables seamless integration between Pureflow's reactive system
 /// and Flutter's widget layer. It implements [ValueListenable] by delegating
-/// all operations to the underlying PureFlow source, with no additional memory
+/// all operations to the underlying Pureflow source, with no additional memory
 /// overhead.
 ///
 /// ## Features
@@ -16,7 +16,7 @@ import 'package:pureflow/pureflow.dart' as pureflow;
 /// - **Read-only**: Provides only read access to the value; mutations must go
 ///   through the original `Store`
 /// - **Transparent delegation**: All listener management is handled by the
-///   underlying PureFlow source
+///   underlying Pureflow source
 ///
 /// ## Usage with ValueListenableBuilder
 ///
@@ -67,7 +67,7 @@ class ValueUnitListenable<T> implements ValueListenable<T> {
   /// ensures consistent behavior across the application.
   ///
   /// ## Parameters
-  /// - [source]: A PureFlow `ValueHolder` (typically a `Store` or `Computed`)
+  /// - [source]: A Pureflow `ValueHolder` (typically a `Store` or `Computed`)
   ///   to adapt to Flutter's `ValueListenable` interface.
   ///
   /// ## Returns
@@ -111,7 +111,7 @@ class ValueUnitListenable<T> implements ValueListenable<T> {
   /// Registers a listener to be called when the value changes.
   ///
   /// This method delegates directly to the underlying source's [addListener],
-  /// so the listener will be called according to PureFlow's notification
+  /// so the listener will be called according to Pureflow's notification
   /// semantics.
   ///
   /// ## Parameters

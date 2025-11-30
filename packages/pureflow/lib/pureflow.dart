@@ -1,6 +1,6 @@
-/// PureFlow - A high-performance reactive signals library for Dart and Flutter.
+/// Pureflow - A high-performance reactive signals library for Dart and Flutter.
 ///
-/// PureFlow provides a minimal, fast, and type-safe reactive state management
+/// Pureflow provides a minimal, fast, and type-safe reactive state management
 /// solution. It combines the simplicity of signals with the power of computed
 /// values and controlled async pipelines.
 ///
@@ -62,7 +62,7 @@
 ///
 /// ## Performance
 ///
-/// PureFlow is designed for maximum performance:
+/// Pureflow is designed for maximum performance:
 /// - Faster than signals_core in all benchmarks
 /// - Zero-allocation listener management with linked lists
 /// - Lazy computation with efficient dirty tracking

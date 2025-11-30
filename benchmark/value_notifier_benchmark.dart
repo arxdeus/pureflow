@@ -2,9 +2,9 @@ import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:pureflow/pureflow.dart' as pureflow;
 import 'value_notifier/listenable.dart';
 
-/// Comparison benchmark: PureFlow Signal/Computed vs ValueNotifier
+/// Comparison benchmark: Pureflow Signal/Computed vs ValueNotifier
 void main() {
-  print('PureFlow vs ValueNotifier - Performance Comparison');
+  print('Pureflow vs ValueNotifier - Performance Comparison');
   print('Using benchmark_harness (10 iterations, 2s warmup)\n');
   print('=' * 90);
 
@@ -67,12 +67,12 @@ void _runComparison(
   final vnUs = valueNotifier.measure();
 
   final ratio = vnUs / pureUs;
-  final winner = ratio > 1 ? 'PureFlow' : 'ValueNotifier';
+  final winner = ratio > 1 ? 'Pureflow' : 'ValueNotifier';
   final diff = ratio > 1 ? ratio : 1 / ratio;
 
   print(
     '${name.padRight(25)} '
-    'PureFlow: ${pureUs.toStringAsFixed(2).padLeft(10)} μs  '
+    'Pureflow: ${pureUs.toStringAsFixed(2).padLeft(10)} μs  '
     'ValueNotifier: ${vnUs.toStringAsFixed(2).padLeft(10)} μs  '
     '[$winner ${diff.toStringAsFixed(1)}x faster]',
   );
@@ -83,7 +83,7 @@ void _runComparison(
 // ============================================================================
 
 class PureFlowSignalCreation extends BenchmarkBase {
-  PureFlowSignalCreation() : super('PureFlow Signal Creation');
+  PureFlowSignalCreation() : super('Pureflow Signal Creation');
 
   late List<pureflow.Store<int>> _signals;
 
@@ -123,7 +123,7 @@ class ValueNotifierCreation extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowSignalReads extends BenchmarkBase {
-  PureFlowSignalReads() : super('PureFlow Signal Reads');
+  PureFlowSignalReads() : super('Pureflow Signal Reads');
 
   late pureflow.Store<int> _signal;
 
@@ -177,7 +177,7 @@ class ValueNotifierReads extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowSignalWrites extends BenchmarkBase {
-  PureFlowSignalWrites() : super('PureFlow Signal Writes');
+  PureFlowSignalWrites() : super('Pureflow Signal Writes');
 
   late pureflow.Store<int> _signal;
 
@@ -228,7 +228,7 @@ class ValueNotifierWrites extends BenchmarkBase {
 
 class PureFlowSignalWritesWithListener extends BenchmarkBase {
   PureFlowSignalWritesWithListener()
-      : super('PureFlow Signal Writes + Listener');
+      : super('Pureflow Signal Writes + Listener');
 
   late pureflow.Store<int> _signal;
   late pureflow.Computed<int> _computed;
@@ -290,7 +290,7 @@ class ValueNotifierWritesWithListener extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowSignalWritesWith10Listeners extends BenchmarkBase {
-  PureFlowSignalWritesWith10Listeners() : super('PureFlow 10 Listeners');
+  PureFlowSignalWritesWith10Listeners() : super('Pureflow 10 Listeners');
 
   late pureflow.Store<int> _signal;
   late List<pureflow.Computed<int>> _computeds;
@@ -370,7 +370,7 @@ class ValueNotifierWritesWith10Listeners extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowComputedReads extends BenchmarkBase {
-  PureFlowComputedReads() : super('PureFlow Computed Reads');
+  PureFlowComputedReads() : super('Pureflow Computed Reads');
 
   late pureflow.Store<int> _signal;
   late pureflow.Computed<int> _computed;
@@ -436,7 +436,7 @@ class ValueNotifierComputedReads extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowComputedChain extends BenchmarkBase {
-  PureFlowComputedChain() : super('PureFlow Computed Chain');
+  PureFlowComputedChain() : super('Pureflow Computed Chain');
 
   late pureflow.Store<int> _source;
   late pureflow.Computed<int> _c1;
@@ -539,7 +539,7 @@ class ValueNotifierComputedChain extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowDiamond extends BenchmarkBase {
-  PureFlowDiamond() : super('PureFlow Diamond');
+  PureFlowDiamond() : super('Pureflow Diamond');
 
   late pureflow.Store<int> _source;
   late pureflow.Computed<int> _left;
@@ -636,7 +636,7 @@ class ValueNotifierDiamond extends BenchmarkBase {
 // ============================================================================
 
 class PureFlowManyListeners extends BenchmarkBase {
-  PureFlowManyListeners() : super('PureFlow Many Listeners');
+  PureFlowManyListeners() : super('Pureflow Many Listeners');
 
   late pureflow.Store<int> _source;
   late List<pureflow.Computed<int>> _computeds;

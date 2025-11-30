@@ -7,7 +7,7 @@ typedef VoidCallback = void Function();
 
 /// An object that maintains a list of listeners and notifies them when changes occur.
 ///
-/// This is the base interface for the observer pattern implementation in PureFlow.
+/// This is the base interface for the observer pattern implementation in Pureflow.
 /// Any object that needs to notify external code about state changes should
 /// implement this interface.
 ///

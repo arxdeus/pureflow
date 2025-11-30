@@ -1,8 +1,16 @@
-# PureFlow
+# Pureflow
+
+[![Codecheck](https://github.com/arxdeus/pureflow/actions/workflows/code_check.yaml/badge.svg?branch=main)](https://github.com/arxdeus/pureflow/actions/workflows/code_check.yaml)
+[![Dependabot Updates](https://github.com/arxdeus/pureflow/actions/workflows/dependabot/dependabot-updates/badge.svg?branch=main)](https://github.com/arxdeus/pureflow/actions/workflows/dependabot/dependabot-updates)
+
+**`pureflow`**: [![pureflow](https://img.shields.io/pub/v/pureflow.svg)](https://pub.dev/packages/pureflow)
+
+
+**`pureflow_flutter`**: [![pureflow_flutter](https://img.shields.io/pub/v/pureflow_flutter.svg)](https://pub.dev/packages/pureflow_flutter)
 
 A high-performance reactive state management library for Dart and Flutter
 
-PureFlow provides a minimal, fast, and type-safe reactive state management solution. It combines the simplicity of signals with the power of computed values and controlled async pipelines.
+Pureflow provides a minimal, fast, and type-safe reactive state management solution. It combines the simplicity of signals with the power of computed values and controlled async pipelines.
 
 ---
 
@@ -21,7 +29,7 @@ PureFlow provides a minimal, fast, and type-safe reactive state management solut
 
 ## Installation
 
-Add PureFlow to your `pubspec.yaml`:
+Add Pureflow to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -396,7 +404,7 @@ class AuthenticationController {
 
 ## Performance
 
-PureFlow is engineered for maximum performance:
+Pureflow is engineered for maximum performance:
 
 | Feature | Benefit |
 |---------|---------|
@@ -406,7 +414,7 @@ PureFlow is engineered for maximum performance:
 | **Pooled Nodes** | Reduced GC pressure |
 | **Batch Updates** | Minimize notification overhead |
 
-In benchmarks, PureFlow outperforms popular packages almost across all operations.
+In benchmarks, Pureflow outperforms popular packages almost across all operations.
 
 ---
 
@@ -446,7 +454,7 @@ class CounterPage extends StatelessWidget {
 
 ### Usage with AnimatedBuilder
 
-Since `ValueListenable` extends `Listenable`, you can use PureFlow with any widget that accepts a `Listenable`:
+Since `ValueListenable` extends `Listenable`, you can use Pureflow with any widget that accepts a `Listenable`:
 
 ```dart
 AnimatedBuilder(
@@ -476,7 +484,7 @@ ValueListenableBuilder<String>(
 The `ValueUnitListenable` adapter is designed for maximum efficiency:
 
 - **No allocation per access** — Instances are cached and bound using `Expando`
-- **Direct delegation** — All operations forward to PureFlow's listener system
+- **Direct delegation** — All operations forward to Pureflow's listener system
 - **Cached instances** — Same source always returns the same adapter
 
 ```dart

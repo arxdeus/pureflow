@@ -8,7 +8,7 @@ import 'package:pureflow/src/interfaces.dart';
 /// A derived reactive value that automatically tracks its dependencies and
 /// recomputes lazily when they change.
 ///
-/// [Computed] is the core primitive for derived state in PureFlow. It wraps
+/// [Computed] is the core primitive for derived state in Pureflow. It wraps
 /// a computation function and automatically:
 /// - Tracks which `Store` and [Computed] values are accessed during computation
 /// - Marks itself as "dirty" when any dependency changes

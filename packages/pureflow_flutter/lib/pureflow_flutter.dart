@@ -2,7 +2,7 @@
 ///
 /// ### With ValueListenableBuilder
 ///
-/// The simplest way to use PureFlow with Flutter is through the `asListenable`
+/// The simplest way to use Pureflow with Flutter is through the `asListenable`
 /// extension:
 ///
 /// ```dart
@@ -26,7 +26,7 @@
 ///
 /// ### With AnimatedBuilder
 ///
-/// Since `ValueListenable` extends `Listenable`, you can use PureFlow stores
+/// Since `ValueListenable` extends `Listenable`, you can use Pureflow stores
 /// with any widget that accepts a `Listenable`:
 ///
 /// ```dart
@@ -57,7 +57,7 @@
 /// The `ValueUnitListenable` adapter is designed for zero overhead:
 /// - No additional memory allocation per access
 /// - Instances are cached per source using `Expando`
-/// - Direct delegation to PureFlow's listener system
+/// - Direct delegation to Pureflow's listener system
 library;
 
 export 'package:pureflow/pureflow.dart';

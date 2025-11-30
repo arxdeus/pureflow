@@ -1,9 +1,9 @@
 import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:pureflow/pureflow.dart';
 
-/// Benchmark suite for PureFlow reactive primitives using benchmark_harness.
+/// Benchmark suite for Pureflow reactive primitives using benchmark_harness.
 void main() {
-  print('PureFlow - Performance Benchmark (benchmark_harness)\n');
+  print('Pureflow - Performance Benchmark (benchmark_harness)\n');
   print('=' * 60);
 
   SignalCreationBenchmark().report();

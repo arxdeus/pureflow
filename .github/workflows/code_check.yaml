@@ -1,0 +1,28 @@
+name: Codecheck
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    types:
+      - opened
+      - reopened
+    branches:
+      - 'main'
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+env:
+  FLUTTER_TEST_REPORT: ${{github.workspace}}/flutter-test-report.json
+
+jobs:
+  code_check:
+    uses: arxdeus/github_workflows/.github/workflows/dart_monorepo_code_check.yaml@main
+    with:
+      line-length: 80
