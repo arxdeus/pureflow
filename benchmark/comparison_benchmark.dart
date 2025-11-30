@@ -1,5 +1,5 @@
 import 'package:benchmark_harness/benchmark_harness.dart';
-import '../packages/pureflow/lib/pureflow.dart' as pureflow;
+import 'package:pureflow/pureflow.dart' as pureflow;
 import 'package:signals_core/signals_core.dart' as signals;
 
 /// Comparison benchmark: PureFlow vs signals_core (pub.dev)

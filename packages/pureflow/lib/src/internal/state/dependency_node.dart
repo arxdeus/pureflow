@@ -1,5 +1,5 @@
 import 'package:meta/meta.dart';
-import 'reactive_source.dart';
+import 'package:pureflow/src/internal/state/reactive_source.dart';
 
 // ============================================================================
 // Object Pool for DependencyNode

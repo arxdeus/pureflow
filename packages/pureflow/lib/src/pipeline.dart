@@ -1,4 +1,4 @@
-import 'implementation/pipeline/pipeline.dart';
+import 'package:pureflow/src/implementation/pipeline/pipeline.dart';
 
 export 'implementation/pipeline/pipeline.dart' show PipelineEventContext;
 

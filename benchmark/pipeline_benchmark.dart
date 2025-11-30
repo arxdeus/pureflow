@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../packages/pureflow/lib/pureflow.dart';
+import 'package:pureflow/pureflow.dart';
 
 /// Benchmark comparing the new pipeline implementation (custom Stream)
 /// vs the old one (async* generator).

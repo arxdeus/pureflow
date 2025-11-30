@@ -1,6 +1,6 @@
-import '../../common/bit_flags.dart';
-import '../../internal/state/reactive_source.dart';
-import '../../store.dart';
+import 'package:pureflow/src/common/bit_flags.dart';
+import 'package:pureflow/src/internal/state/reactive_source.dart';
+import 'package:pureflow/src/store.dart';
 
 // ============================================================================
 // StoreImpl (Signal) - Optimized Implementation

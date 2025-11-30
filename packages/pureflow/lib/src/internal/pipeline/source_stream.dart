@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
-import '../../common/bit_flags.dart';
-import '../../common/synchronous_future.dart';
+import 'package:pureflow/src/common/bit_flags.dart';
+import 'package:pureflow/src/common/synchronous_future.dart';
 
-import 'task_stream.dart';
+import 'package:pureflow/src/internal/pipeline/task_stream.dart';
 
 /// Bit flags for source stream subscription status.
 const int srcCanceledBit = 1 << 0;

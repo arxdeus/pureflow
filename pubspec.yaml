@@ -11,6 +11,8 @@ dev_dependencies:
   benchmark_harness: ^2.4.0
   signals_core: ^6.2.0
 
+  pureflow: any
+  meta: any
 workspace:
 - packages/pureflow
 - packages/pureflow_flutter

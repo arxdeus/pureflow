@@ -1,4 +1,4 @@
-import '../packages/pureflow/lib/pureflow.dart';
+import 'package:pureflow/pureflow.dart';
 import 'package:test/test.dart';
 
 void main() {

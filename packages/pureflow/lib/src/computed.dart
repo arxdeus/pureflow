@@ -1,5 +1,5 @@
-import 'implementation/state/computed_impl.dart';
-import 'interfaces.dart';
+import 'package:pureflow/src/implementation/state/computed_impl.dart';
+import 'package:pureflow/src/interfaces.dart';
 
 // ============================================================================
 // Computed - Public Interface
