@@ -69,7 +69,7 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
       // Future.sync wraps synchronous exceptions into Future errors
       final result = await Future.sync(() => evt.task(evt));
       final statusFlag = _statusFlag;
-      if (!statusFlag.hasFlag(canceledBit) && !evt.isCancelled) {
+      if (!statusFlag.hasFlag(canceledBit) && evt.isActive) {
         await _completeWithResult(result);
       } else {
         // Task was cancelled, but still complete the completer to avoid hanging
@@ -87,7 +87,7 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
       }
       // Then handle error through stream subscription if needed
       final statusFlag = _statusFlag;
-      if (!statusFlag.hasFlag(canceledBit) && !evt.isCancelled) {
+      if (!statusFlag.hasFlag(canceledBit) && evt.isActive) {
         await _completeWithError(error, stackTrace);
       } else {
         // Even if not emitting, we need to signal completion for asyncExpand
@@ -166,7 +166,7 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
 
     if (!statusFlag.hasFlag(canceledBit) &&
         !evt.completer.isCompleted &&
-        !evt.isCancelled) {
+        evt.isActive) {
       evt.cancel();
     }
     if (_lastError == null) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:meta/meta.dart';
 import 'package:pureflow/src/internal/pipeline/task_stream.dart';
 
 /// Context object passed to pipeline tasks providing access to cancellation state.
@@ -32,12 +33,11 @@ import 'package:pureflow/src/internal/pipeline/task_stream.dart';
 /// A task becomes inactive when:
 /// 1. **Pipeline disposed**: `Pipeline.dispose` was called
 /// 2. **Task superseded**: A newer task cancelled this one (with restartable transformer)
-/// 3. **Explicit cancellation**: The task's [cancel] method was called
+/// 3. **Explicit cancellation**: The task was cancelled by the pipeline
 ///
 /// ## Properties
 ///
 /// - [isActive]: Combined check - task not cancelled AND pipeline active
-/// - [isCancelled]: Whether this specific task was cancelled
 ///
 /// ## Example with Loop
 ///
@@ -58,15 +58,11 @@ import 'package:pureflow/src/internal/pipeline/task_stream.dart';
 /// ```
 final class PipelineEventContext {
   /// The async task function to be executed.
-  ///
-  /// This is the function passed to `Pipeline.run` that performs the actual
-  /// work. It receives this context as a parameter.
+  @internal
   final Future<dynamic> Function(PipelineEventContext context) task;
 
   /// The completer that will be completed with the task's result.
-  ///
-  /// This completer is used internally to bridge the async task execution
-  /// with the Future returned by `Pipeline.run`.
+  @internal
   final Completer<dynamic> completer;
 
   final TaskStream _taskStream;
@@ -74,14 +70,7 @@ final class PipelineEventContext {
   bool _isCancelled = false;
 
   /// Creates a new pipeline event context.
-  ///
-  /// This constructor is internal to the pipeline implementation.
-  /// Users receive contexts through `Pipeline.run` callbacks.
-  ///
-  /// ## Parameters
-  /// - [task]: The async function to execute
-  /// - [completer]: The completer to signal completion
-  /// - [taskStream]: Reference to the pipeline's task stream for checking active state
+  @internal
   PipelineEventContext({
     required this.task,
     required this.completer,
@@ -91,7 +80,7 @@ final class PipelineEventContext {
   /// Returns whether this task is still active and should continue execution.
   ///
   /// A task is active when:
-  /// - It has not been explicitly cancelled via [cancel]
+  /// - It has not been cancelled
   /// - The pipeline has not been disposed
   ///
   /// Tasks should check this property:
@@ -124,67 +113,7 @@ final class PipelineEventContext {
   @pragma('vm:prefer-inline')
   bool get isActive => !_isCancelled && _taskStream.isActive;
 
-  /// Returns whether this specific task has been cancelled.
-  ///
-  /// Unlike [isActive], this only checks if [cancel] was called on this
-  /// context, not whether the pipeline itself is still active.
-  ///
-  /// ## Returns
-  /// `true` if [cancel] was called, `false` otherwise.
-  ///
-  /// ## Use Cases
-  ///
-  /// Use [isCancelled] when you need to distinguish between:
-  /// - Task cancelled by transformer (e.g., newer task superseded this one)
-  /// - Pipeline being disposed
-  ///
-  /// In most cases, [isActive] is preferred as it handles both scenarios.
-  ///
-  /// ## Example
-  /// ```dart
-  /// await pipeline.run((context) async {
-  ///   final result = await doWork();
-  ///
-  ///   if (context.isCancelled) {
-  ///     // This task was specifically cancelled
-  ///     log.info('Task cancelled, discarding result');
-  ///   } else if (!context.isActive) {
-  ///     // Pipeline is shutting down
-  ///     log.info('Pipeline disposing');
-  ///   }
-  ///
-  ///   return result;
-  /// });
-  /// ```
-  @pragma('vm:prefer-inline')
-  bool get isCancelled => _isCancelled;
-
-  /// Marks this task as cancelled.
-  ///
-  /// After calling this method:
-  /// - [isCancelled] returns `true`
-  /// - [isActive] returns `false`
-  ///
-  /// This method is typically called by the pipeline's transformer when
-  /// implementing cancellation strategies (e.g., restartable transformer
-  /// cancelling the previous task when a new one arrives).
-  ///
-  /// ## Cooperative Cancellation
-  ///
-  /// Calling [cancel] does not forcefully stop the task. The task must
-  /// cooperatively check [isActive] or [isCancelled] and return early.
-  ///
-  /// ## Idempotent
-  ///
-  /// Calling [cancel] multiple times is safe; subsequent calls have no effect.
-  ///
-  /// ## Example
-  /// ```dart
-  /// // In a custom transformer
-  /// void onNewEvent(PipelineEventContext previousContext) {
-  ///   previousContext.cancel(); // Cancel the previous task
-  /// }
-  /// ```
+  @internal
   @pragma('vm:prefer-inline')
   void cancel() => _isCancelled = true;
 }

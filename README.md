@@ -499,7 +499,6 @@ print(identical(store.asListenable, store.asListenable)); // true
 | Member | Description |
 |--------|-------------|
 | `bool isActive` | Whether task should continue |
-| `bool isCancelled` | Whether task was explicitly cancelled |
 
 ---
 

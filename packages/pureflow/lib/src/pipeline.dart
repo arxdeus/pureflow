@@ -170,7 +170,6 @@ abstract class Pipeline {
   /// The task is queued according to the pipeline's transformer strategy.
   /// It receives a [PipelineEventContext] that provides:
   /// - [PipelineEventContext.isActive]: Whether the task should continue
-  /// - [PipelineEventContext.isCancelled]: Whether the task was explicitly cancelled
   ///
   /// ## Type Parameters
   /// - [R]: The return type of the task
