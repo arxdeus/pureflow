@@ -210,7 +210,7 @@ firstName.value = 'John';  // Notification 1: fullName = "John"
 lastName.value = 'Doe';    // Notification 2: fullName = "John Doe"
 
 // With batching: 1 notification after both updates
-Store.batch(() {
+batch(() {
   firstName.value = 'Jane';
   lastName.value = 'Smith';
 }); // Single notification: fullName = "Jane Smith"
@@ -221,9 +221,9 @@ Store.batch(() {
 Batches can be nested. Notifications are only sent when the outermost batch completes:
 
 ```dart
-Store.batch(() {
+batch(() {
   counter.value = 1;
-  Store.batch(() {
+  batch(() {
     counter.value = 2;
   }); // No notification yet
   counter.value = 3;
@@ -232,10 +232,10 @@ Store.batch(() {
 
 #### Return Values
 
-`Store.batch` returns the value from the action function:
+`batch` returns the value from the action function:
 
 ```dart
-final result = Store.batch(() {
+final result = batch(() {
   firstName.value = 'John';
   lastName.value = 'Doe';
   return fullName.value;
@@ -371,7 +371,7 @@ class AuthenticationController {
           return;
         }
         // Update state atomically
-        Store.batch(() {
+        batch(() {
           _user.value = user;
           _isLoading.value = false;
         });
@@ -379,7 +379,7 @@ class AuthenticationController {
         return user;
       } catch (e) {
         if (context.isActive) {
-          Store.batch(() {
+          batch(() {
             _error.value = e.toString();
             _isLoading.value = false;
           });

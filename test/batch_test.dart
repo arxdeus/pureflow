@@ -13,7 +13,7 @@ void main() {
 
       expect(c.value, 0);
 
-      Store.batch(() {
+      batch(() {
         s.value = 42;
       });
 
@@ -34,7 +34,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 3;
@@ -50,12 +50,12 @@ void main() {
     });
 
     test('batch returns value', () {
-      final result = Store.batch(() => 42);
+      final result = batch(() => 42);
       expect(result, 42);
     });
 
     test('batch returns complex value', () {
-      final result = Store.batch(() {
+      final result = batch(() {
         return {'a': 1, 'b': 2};
       });
       expect(result, {'a': 1, 'b': 2});
@@ -75,7 +75,7 @@ void main() {
       expect(sum.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         a.value = 1;
         b.value = 2;
         c.value = 3;
@@ -96,7 +96,7 @@ void main() {
 
       expect(c.value, 20);
 
-      final result = Store.batch(() {
+      final result = batch(() {
         s.value = 5;
         // Inside batch, computed still sees old value because
         // signals haven't notified dependents yet
@@ -130,7 +130,7 @@ void main() {
       expect(c.value, 0);
       expect(notifyCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 3;
@@ -155,7 +155,7 @@ void main() {
       expect(c.value, 0);
       expect(values, [0]);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 3;
@@ -174,7 +174,7 @@ void main() {
 
       expect(c.value, 0);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1; // Would be 10
         s.value = 2; // Would be 20
         s.value = 5; // Will be 50
@@ -212,7 +212,7 @@ void main() {
       expect(c2Count, 1);
       expect(c3Count, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 10;
         s.value = 20;
       });
@@ -254,7 +254,7 @@ void main() {
       expect(rightCount, 1);
       expect(bottomCount, 1);
 
-      Store.batch(() {
+      batch(() {
         source.value = 10;
         source.value = 20;
         source.value = 30;
@@ -288,9 +288,9 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
-        Store.batch(() {
+        batch(() {
           s.value = 2;
         });
         s.value = 3;
@@ -314,15 +314,15 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
-        Store.batch(() {
+        batch(() {
           s.value = 2;
-          Store.batch(() {
+          batch(() {
             s.value = 3;
-            Store.batch(() {
+            batch(() {
               s.value = 4;
-              Store.batch(() {
+              batch(() {
                 s.value = 5;
               });
             });
@@ -340,9 +340,9 @@ void main() {
     test('nested batch with return values', () {
       final s = Store(0);
 
-      final result = Store.batch(() {
+      final result = batch(() {
         s.value = 1;
-        final inner = Store.batch(() {
+        final inner = batch(() {
           s.value = 2;
           return 'inner';
         });
@@ -376,9 +376,9 @@ void main() {
       expect(aCount, 1);
       expect(bCount, 1);
 
-      Store.batch(() {
+      batch(() {
         a.value = 1;
-        Store.batch(() {
+        batch(() {
           b.value = 2;
         });
         a.value = 3;
@@ -406,9 +406,9 @@ void main() {
 
       expect(c.value, 0);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
-        Store.batch(() {
+        batch(() {
           s.value = 2;
           // Inner batch ends but should not flush
         });
@@ -436,7 +436,7 @@ void main() {
       expect(c.value, 0);
 
       expect(
-        () => Store.batch(() {
+        () => batch(() {
           s.value = 42;
           throw Exception('test error');
         }),
@@ -457,9 +457,9 @@ void main() {
       expect(c.value, 0);
 
       expect(
-        () => Store.batch(() {
+        () => batch(() {
           s.value = 1;
-          Store.batch(() {
+          batch(() {
             s.value = 2;
             throw Exception('inner error');
           });
@@ -481,7 +481,7 @@ void main() {
       expect(c.value, 0);
 
       try {
-        Store.batch(() {
+        batch(() {
           s.value = 1;
           throw Exception('error');
         });
@@ -490,7 +490,7 @@ void main() {
       expect(c.value, 1);
 
       // New batch should work fine
-      Store.batch(() {
+      batch(() {
         s.value = 100;
       });
 
@@ -512,15 +512,15 @@ void main() {
       expect(computeCount, 1);
 
       try {
-        Store.batch(() {
+        batch(() {
           throw Exception('error');
         });
       } catch (_) {}
 
       // Nested batch should work
-      Store.batch(() {
+      batch(() {
         s.value = 1;
-        Store.batch(() {
+        batch(() {
           s.value = 2;
         });
         s.value = 3;
@@ -540,7 +540,7 @@ void main() {
 
   group('ValueUnit.batch - Edge Cases', () {
     test('empty batch', () {
-      final result = Store.batch(() {});
+      final result = batch(() {});
       expect(result, isNull);
     });
 
@@ -555,7 +555,7 @@ void main() {
       expect(c.value, 42);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         // No changes
         final _ = s.value; // Just read
       });
@@ -575,7 +575,7 @@ void main() {
 
       s.dispose();
 
-      Store.batch(() {
+      batch(() {
         s.value = 42; // Should be ignored
       });
 
@@ -593,7 +593,7 @@ void main() {
 
       a.dispose();
 
-      Store.batch(() {
+      batch(() {
         a.value = 100; // Ignored
         b.value = 20;
       });
@@ -619,7 +619,7 @@ void main() {
       expect(c.value, 1);
       expect(computeCount, 2);
 
-      Store.batch(() {
+      batch(() {
         s.value = 2;
         s.value = 3;
       });
@@ -645,7 +645,7 @@ void main() {
       expect(c.value, 42);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 42; // Same value
         s.value = 42; // Same value
       });
@@ -668,7 +668,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 0; // Back to original
@@ -700,7 +700,7 @@ void main() {
       expect(sum.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         for (var i = 0; i < 100; i++) {
           signals[i].value = i + 1;
         }
@@ -726,7 +726,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         for (var i = 0; i < 1000; i++) {
           s.value = i;
         }
@@ -756,7 +756,7 @@ void main() {
       }
       expect(totalComputeCount, 50);
 
-      Store.batch(() {
+      batch(() {
         s.value = 100;
         s.value = 200;
       });
@@ -788,13 +788,13 @@ void main() {
           s.value = depth;
           return;
         }
-        Store.batch(() {
+        batch(() {
           s.value = depth;
           nestedBatch(depth + 1, maxDepth);
         });
       }
 
-      Store.batch(() {
+      batch(() {
         nestedBatch(1, 20);
       });
 
@@ -819,7 +819,7 @@ void main() {
 
       expect(c3.value, 8);
 
-      Store.batch(() {
+      batch(() {
         s.value = 2;
         s.value = 3;
         s.value = 4;
@@ -843,7 +843,7 @@ void main() {
 
       expect(end.value, 10); // ((1+1)+(1+2))*2 = 10
 
-      Store.batch(() {
+      batch(() {
         source.value = 10;
         source.value = 20;
       });
@@ -871,7 +871,7 @@ void main() {
       expect(c.value, 1);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         a.value = 10;
         b.value = 20;
         condition.value = false;
@@ -889,7 +889,7 @@ void main() {
     test('batch does not affect reading', () {
       final s = Store(0);
 
-      final result = Store.batch(() {
+      final result = batch(() {
         s.value = 1;
         final v1 = s.value;
         s.value = 2;
@@ -916,19 +916,19 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         s.value = 1;
       });
       expect(c.value, 1);
       expect(computeCount, 2);
 
-      Store.batch(() {
+      batch(() {
         s.value = 2;
       });
       expect(c.value, 2);
       expect(computeCount, 3);
 
-      Store.batch(() {
+      batch(() {
         s.value = 3;
       });
       expect(c.value, 3);
@@ -944,7 +944,7 @@ void main() {
 
       expect(c.value, 0);
 
-      final result = Store.batch(() {
+      final result = batch(() {
         s.value = 1;
         // Simulate async-like step by step updates
         s.value = 2;
@@ -972,7 +972,7 @@ void main() {
       expect(c.value, 0);
       expect(history, ['a=0, b=0']);
 
-      Store.batch(() {
+      batch(() {
         a.value = 1;
         b.value = 2;
       });
@@ -991,7 +991,7 @@ void main() {
 
       expect(sum.value, 6);
 
-      Store.batch(() {
+      batch(() {
         list.value = [4, 5, 6];
         list.value = [7, 8, 9];
       });
@@ -1013,7 +1013,7 @@ void main() {
       expect(c.value, false);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         toggle.value = true;
         toggle.value = false;
         toggle.value = true;
@@ -1034,7 +1034,7 @@ void main() {
 
       expect(length.value, 5);
 
-      Store.batch(() {
+      batch(() {
         text.value = 'world';
         text.value = 'hello world';
       });
@@ -1051,7 +1051,7 @@ void main() {
 
       expect(keys.value, ['a']);
 
-      Store.batch(() {
+      batch(() {
         map.value = {'a': 1, 'b': 2};
         map.value = {'a': 1, 'b': 2, 'c': 3};
       });
@@ -1083,7 +1083,7 @@ void main() {
       expect(c2Count, 1);
 
       // Batch only updates s1
-      Store.batch(() {
+      batch(() {
         s1.value = 1;
         s1.value = 2;
       });
@@ -1110,7 +1110,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Store.batch(() {
+      batch(() {
         for (var i = 0; i < 100; i++) {
           counter.update((v) => v + 1);
         }
@@ -1124,19 +1124,19 @@ void main() {
     });
 
     test('batch return type preserved', () {
-      final intResult = Store.batch(() => 42);
+      final intResult = batch(() => 42);
       expect(intResult, isA<int>());
       expect(intResult, 42);
 
-      final stringResult = Store.batch(() => 'hello');
+      final stringResult = batch(() => 'hello');
       expect(stringResult, isA<String>());
       expect(stringResult, 'hello');
 
-      final listResult = Store.batch(() => [1, 2, 3]);
+      final listResult = batch(() => [1, 2, 3]);
       expect(listResult, isA<List<int>>());
       expect(listResult, [1, 2, 3]);
 
-      final mapResult = Store.batch(() => {'a': 1});
+      final mapResult = batch(() => {'a': 1});
       expect(mapResult, isA<Map<String, int>>());
       expect(mapResult, {'a': 1});
     });
@@ -1152,7 +1152,7 @@ void main() {
 
       expect(abc.value, 6); // a + b + c = 1 + 2 + 3
 
-      Store.batch(() {
+      batch(() {
         a.value = 10;
         b.value = 20;
         c.value = 30;
@@ -1177,7 +1177,7 @@ void main() {
 
       expect(result.value, '42-hello-true');
 
-      Store.batch(() {
+      batch(() {
         num.value = 100;
         text.value = 'world';
         flag.value = false;

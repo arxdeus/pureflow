@@ -161,7 +161,7 @@ class AuthenticationController {
         );
 
         // Update state atomically using batch
-        Store.batch(() {
+        batch(() {
           _user.value = user;
           _isLoading.value = false;
         });
@@ -170,7 +170,7 @@ class AuthenticationController {
       } catch (e) {
         // Only update error if still active
         if (context.isActive) {
-          Store.batch(() {
+          batch(() {
             _error.value = e.toString();
             _isLoading.value = false;
           });
@@ -191,14 +191,14 @@ class AuthenticationController {
 
         if (!context.isActive) return;
 
-        Store.batch(() {
+        batch(() {
           _user.value = null;
           _error.value = null;
           _isLoading.value = false;
         });
       } catch (e) {
         if (context.isActive) {
-          Store.batch(() {
+          batch(() {
             _error.value = e.toString();
             _isLoading.value = false;
           });
@@ -346,7 +346,7 @@ class GeolocationController {
         // Simulate location data (random location around San Francisco)
         final location = _simulateLocation();
 
-        Store.batch(() {
+        batch(() {
           _currentLocation.value = location;
           _isLoading.value = false;
         });
@@ -354,7 +354,7 @@ class GeolocationController {
         return location;
       } catch (e) {
         if (context.isActive) {
-          Store.batch(() {
+          batch(() {
             _error.value = e.toString();
             _isLoading.value = false;
           });

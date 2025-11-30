@@ -1,4 +1,4 @@
-import 'package:meta/meta.dart';
+import 'package:pureflow/src/batch.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/common/equality.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
@@ -14,7 +14,7 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
       : _equality = equality;
 
   T _value;
-  bool _inBatch = false;
+  bool inBatch = false;
   final bool Function(T, T)? _equality;
 
   @override
@@ -41,8 +41,8 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
 
     // Handle batching - defer notification
     if (batchDepth > 0) {
-      if (!_inBatch) {
-        _inBatch = true;
+      if (!inBatch) {
+        inBatch = true;
         // Use pre-allocated buffer, grow if needed
         if (batchCount >= batchBuffer.length) {
           batchBuffer.length *= 2;
@@ -62,37 +62,4 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
 
   @override
   String toString() => 'Store<$T>($_value)';
-}
-
-// ============================================================================
-// Batch Implementation (accessible from Store)
-// ============================================================================
-
-/// Runs a function within a batch context.
-@internal
-@pragma('vm:prefer-inline')
-R runBatch<R>(R Function() action) {
-  batchDepth++;
-  try {
-    return action();
-  } finally {
-    if (--batchDepth == 0) flushBatch();
-  }
-}
-
-@internal
-@pragma('vm:prefer-inline')
-void flushBatch() {
-  final count = batchCount;
-  if (count == 0) return;
-
-  for (var i = 0; i < count; i++) {
-    final signal = batchBuffer[i]! as StoreImpl<Object?>;
-    signal._inBatch = false;
-    if (!signal.status.hasFlag(disposedBit)) {
-      signal.notifySubscribers();
-    }
-    batchBuffer[i] = null; // Avoid memory leak
-  }
-  batchCount = 0;
 }

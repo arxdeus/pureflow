@@ -412,7 +412,7 @@ class PureFlowBatch extends BenchmarkBase {
   @override
   void run() {
     for (var i = 0; i < 1000; i++) {
-      pureflow.Store.batch(() {
+      pureflow.batch(() {
         for (var j = 0; j < 10; j++) {
           _signals[j].value = i + j;
         }

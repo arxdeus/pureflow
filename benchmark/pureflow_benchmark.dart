@@ -236,7 +236,7 @@ class BatchUpdatesBenchmark extends BenchmarkBase {
   @override
   void run() {
     for (var i = 0; i < _updatesPerRun; i++) {
-      Store.batch(() {
+      batch(() {
         for (var j = 0; j < _signalCount; j++) {
           _signals[j].value = i + j;
         }

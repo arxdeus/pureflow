@@ -95,57 +95,6 @@ abstract class Store<T> implements ReactiveValueHolder<T> {
   factory Store(T value, {bool Function(T, T)? equality}) =>
       StoreImpl<T>(value, equality: equality);
 
-  /// Runs a function within a batch context, deferring all notifications.
-  ///
-  /// When multiple stores are updated within a batch, listeners and
-  /// dependent computed values are only notified once after the batch
-  /// completes. This improves performance and prevents intermediate
-  /// inconsistent states from being observed.
-  ///
-  /// ## Parameters
-  /// - [action]: A function that performs multiple store updates.
-  ///
-  /// ## Returns
-  /// The value returned by [action].
-  ///
-  /// ## Example
-  /// ```dart
-  /// final firstName = Store<String>('');
-  /// final lastName = Store<String>('');
-  /// final updateCount = Store<int>(0);
-  ///
-  /// // Without batching: 2 notifications
-  /// firstName.value = 'John';
-  /// lastName.value = 'Doe';
-  ///
-  /// // With batching: 1 notification after both updates
-  /// Store.batch(() {
-  ///   firstName.value = 'Jane';
-  ///   lastName.value = 'Smith';
-  /// });
-  /// ```
-  ///
-  /// ## Nested Batches
-  ///
-  /// Batches can be nested. Notifications are only sent when the outermost
-  /// batch completes:
-  ///
-  /// ```dart
-  /// Store.batch(() {
-  ///   counter.value = 1;
-  ///   Store.batch(() {
-  ///     counter.value = 2;
-  ///   }); // No notification yet
-  ///   counter.value = 3;
-  /// }); // Single notification with value 3
-  /// ```
-  ///
-  /// ## Error Handling
-  ///
-  /// If [action] throws an exception, the batch is still completed and
-  /// pending notifications are sent before the exception propagates.
-  static R batch<R>(R Function() action) => runBatch(action);
-
   /// The current value of this store.
   ///
   /// Reading this property returns the stored value immediately.
@@ -189,7 +138,7 @@ abstract class Store<T> implements ReactiveValueHolder<T> {
   ///
   /// ## Batching
   ///
-  /// When called inside [batch], the notification is deferred until
+  /// When called inside `batch`, the notification is deferred until
   /// the batch completes.
   set value(T newValue);
 

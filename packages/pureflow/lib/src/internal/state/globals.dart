@@ -20,11 +20,3 @@ const int viewDisposedBit = 1 << 2;
 /// Currently evaluating Computed (for dependency tracking).
 /// Using dynamic to avoid circular imports with Computed.
 ReactiveSource<Object?>? currentView;
-
-/// Current batch depth for batched updates.
-int batchDepth = 0;
-
-/// Pre-allocated batch buffer for better performance.
-final List<ReactiveSource<Object?>?> batchBuffer =
-    List.filled(64, null, growable: true);
-int batchCount = 0;
