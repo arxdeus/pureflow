@@ -25,5 +25,6 @@ ReactiveSource<Object?>? currentView;
 int batchDepth = 0;
 
 /// Pre-allocated batch buffer for better performance.
-final List<Object?> batchBuffer = List.filled(64, null, growable: true);
+final List<ReactiveSource<Object?>?> batchBuffer =
+    List.filled(64, null, growable: true);
 int batchCount = 0;
