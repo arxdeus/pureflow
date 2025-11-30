@@ -14,7 +14,7 @@ topics:
   - state
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.5.0
 
 dependencies:
   meta: ^1.17.0
@@ -25,3 +25,5 @@ dev_dependencies:
   benchmark_harness: ^2.4.0
   signals_core: ^6.2.0
 
+workspace:
+- packages/pureflow_flutter

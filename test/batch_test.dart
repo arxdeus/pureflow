@@ -1,4 +1,3 @@
-import 'package:pureflow/pureflow.dart';
 import 'package:pureflow/src/listenable/listenable.dart';
 import 'package:test/test.dart';
 
@@ -7,14 +6,14 @@ void main() {
   // Basic Operations
   // ============================================================================
 
-  group('Signal.batch - Basic Operations', () {
+  group('ValueUnit.batch - Basic Operations', () {
     test('single signal update in batch', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value);
 
       expect(c.value, 0);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 42;
       });
 
@@ -25,9 +24,9 @@ void main() {
     });
 
     test('multiple updates to same signal in batch', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -35,7 +34,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 3;
@@ -51,24 +50,24 @@ void main() {
     });
 
     test('batch returns value', () {
-      final result = Signal.batch(() => 42);
+      final result = ValueUnit.batch(() => 42);
       expect(result, 42);
     });
 
     test('batch returns complex value', () {
-      final result = Signal.batch(() {
+      final result = ValueUnit.batch(() {
         return {'a': 1, 'b': 2};
       });
       expect(result, {'a': 1, 'b': 2});
     });
 
     test('batch with multiple signals', () {
-      final a = Signal(0);
-      final b = Signal(0);
-      final c = Signal(0);
+      final a = ValueUnit(0);
+      final b = ValueUnit(0);
+      final c = ValueUnit(0);
 
       var computeCount = 0;
-      final sum = Computed(() {
+      final sum = CompositeUnit(() {
         computeCount++;
         return a.value + b.value + c.value;
       });
@@ -76,7 +75,7 @@ void main() {
       expect(sum.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         a.value = 1;
         b.value = 2;
         c.value = 3;
@@ -92,12 +91,12 @@ void main() {
     });
 
     test('batch with signal and computed access', () {
-      final s = Signal(10);
-      final c = Computed(() => s.value * 2);
+      final s = ValueUnit(10);
+      final c = CompositeUnit(() => s.value * 2);
 
       expect(c.value, 20);
 
-      final result = Signal.batch(() {
+      final result = ValueUnit.batch(() {
         s.value = 5;
         // Inside batch, computed still sees old value because
         // signals haven't notified dependents yet
@@ -118,12 +117,12 @@ void main() {
   // Notification Behavior
   // ============================================================================
 
-  group('Signal.batch - Notification Behavior', () {
+  group('ValueUnit.batch - Notification Behavior', () {
     test('only notifies once after batch', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var notifyCount = 0;
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         notifyCount++;
         return s.value;
       });
@@ -131,7 +130,7 @@ void main() {
       expect(c.value, 0);
       expect(notifyCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 3;
@@ -145,10 +144,10 @@ void main() {
     });
 
     test('no intermediate notifications during batch', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       final values = <int>[];
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         values.add(s.value);
         return s.value;
       });
@@ -156,7 +155,7 @@ void main() {
       expect(c.value, 0);
       expect(values, [0]);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 3;
@@ -170,12 +169,12 @@ void main() {
     });
 
     test('computed sees final value after batch', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value * 10);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value * 10);
 
       expect(c.value, 0);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1; // Would be 10
         s.value = 2; // Would be 20
         s.value = 5; // Will be 50
@@ -188,20 +187,20 @@ void main() {
     });
 
     test('multiple computeds notified once each', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var c1Count = 0;
       var c2Count = 0;
       var c3Count = 0;
 
-      final c1 = Computed(() {
+      final c1 = CompositeUnit(() {
         c1Count++;
         return s.value + 1;
       });
-      final c2 = Computed(() {
+      final c2 = CompositeUnit(() {
         c2Count++;
         return s.value + 2;
       });
-      final c3 = Computed(() {
+      final c3 = CompositeUnit(() {
         c3Count++;
         return s.value + 3;
       });
@@ -213,7 +212,7 @@ void main() {
       expect(c2Count, 1);
       expect(c3Count, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 10;
         s.value = 20;
       });
@@ -232,20 +231,20 @@ void main() {
     });
 
     test('diamond dependency notified once', () {
-      final source = Signal(1);
+      final source = ValueUnit(1);
       var leftCount = 0;
       var rightCount = 0;
       var bottomCount = 0;
 
-      final left = Computed(() {
+      final left = CompositeUnit(() {
         leftCount++;
         return source.value + 1;
       });
-      final right = Computed(() {
+      final right = CompositeUnit(() {
         rightCount++;
         return source.value + 2;
       });
-      final bottom = Computed(() {
+      final bottom = CompositeUnit(() {
         bottomCount++;
         return left.value + right.value;
       });
@@ -255,7 +254,7 @@ void main() {
       expect(rightCount, 1);
       expect(bottomCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         source.value = 10;
         source.value = 20;
         source.value = 30;
@@ -277,11 +276,11 @@ void main() {
   // Nesting
   // ============================================================================
 
-  group('Signal.batch - Nesting', () {
+  group('ValueUnit.batch - Nesting', () {
     test('nested batch two levels', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -289,9 +288,9 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
-        Signal.batch(() {
+        ValueUnit.batch(() {
           s.value = 2;
         });
         s.value = 3;
@@ -305,9 +304,9 @@ void main() {
     });
 
     test('deeply nested batch five levels', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -315,15 +314,15 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
-        Signal.batch(() {
+        ValueUnit.batch(() {
           s.value = 2;
-          Signal.batch(() {
+          ValueUnit.batch(() {
             s.value = 3;
-            Signal.batch(() {
+            ValueUnit.batch(() {
               s.value = 4;
-              Signal.batch(() {
+              ValueUnit.batch(() {
                 s.value = 5;
               });
             });
@@ -339,11 +338,11 @@ void main() {
     });
 
     test('nested batch with return values', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
 
-      final result = Signal.batch(() {
+      final result = ValueUnit.batch(() {
         s.value = 1;
-        final inner = Signal.batch(() {
+        final inner = ValueUnit.batch(() {
           s.value = 2;
           return 'inner';
         });
@@ -358,16 +357,16 @@ void main() {
     });
 
     test('nested batches with different signals', () {
-      final a = Signal(0);
-      final b = Signal(0);
+      final a = ValueUnit(0);
+      final b = ValueUnit(0);
       var aCount = 0;
       var bCount = 0;
 
-      final ca = Computed(() {
+      final ca = CompositeUnit(() {
         aCount++;
         return a.value;
       });
-      final cb = Computed(() {
+      final cb = CompositeUnit(() {
         bCount++;
         return b.value;
       });
@@ -377,9 +376,9 @@ void main() {
       expect(aCount, 1);
       expect(bCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         a.value = 1;
-        Signal.batch(() {
+        ValueUnit.batch(() {
           b.value = 2;
         });
         a.value = 3;
@@ -397,19 +396,19 @@ void main() {
     });
 
     test('nested batch does not flush early', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       final values = <int>[];
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         values.add(s.value);
         return s.value;
       });
 
       expect(c.value, 0);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
-        Signal.batch(() {
+        ValueUnit.batch(() {
           s.value = 2;
           // Inner batch ends but should not flush
         });
@@ -429,15 +428,15 @@ void main() {
   // Error Handling
   // ============================================================================
 
-  group('Signal.batch - Error Handling', () {
+  group('ValueUnit.batch - Error Handling', () {
     test('exception in batch still flushes', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value);
 
       expect(c.value, 0);
 
       expect(
-        () => Signal.batch(() {
+        () => ValueUnit.batch(() {
           s.value = 42;
           throw Exception('test error');
         }),
@@ -452,15 +451,15 @@ void main() {
     });
 
     test('exception in nested batch flushes correctly', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value);
 
       expect(c.value, 0);
 
       expect(
-        () => Signal.batch(() {
+        () => ValueUnit.batch(() {
           s.value = 1;
-          Signal.batch(() {
+          ValueUnit.batch(() {
             s.value = 2;
             throw Exception('inner error');
           });
@@ -476,13 +475,13 @@ void main() {
     });
 
     test('batch after exception works normally', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value);
 
       expect(c.value, 0);
 
       try {
-        Signal.batch(() {
+        ValueUnit.batch(() {
           s.value = 1;
           throw Exception('error');
         });
@@ -491,7 +490,7 @@ void main() {
       expect(c.value, 1);
 
       // New batch should work fine
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 100;
       });
 
@@ -502,9 +501,9 @@ void main() {
     });
 
     test('exception does not break subsequent nesting', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -513,15 +512,15 @@ void main() {
       expect(computeCount, 1);
 
       try {
-        Signal.batch(() {
+        ValueUnit.batch(() {
           throw Exception('error');
         });
       } catch (_) {}
 
       // Nested batch should work
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
-        Signal.batch(() {
+        ValueUnit.batch(() {
           s.value = 2;
         });
         s.value = 3;
@@ -539,16 +538,16 @@ void main() {
   // Edge Cases
   // ============================================================================
 
-  group('Signal.batch - Edge Cases', () {
+  group('ValueUnit.batch - Edge Cases', () {
     test('empty batch', () {
-      final result = Signal.batch(() {});
+      final result = ValueUnit.batch(() {});
       expect(result, isNull);
     });
 
     test('batch with no signal changes', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -556,7 +555,7 @@ void main() {
       expect(c.value, 42);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         // No changes
         final _ = s.value; // Just read
       });
@@ -569,14 +568,14 @@ void main() {
     });
 
     test('batch after signal dispose', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value);
 
       expect(c.value, 0);
 
       s.dispose();
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 42; // Should be ignored
       });
 
@@ -586,15 +585,15 @@ void main() {
     });
 
     test('batch with disposed signal among others', () {
-      final a = Signal(1);
-      final b = Signal(2);
-      final sum = Computed(() => a.value + b.value);
+      final a = ValueUnit(1);
+      final b = ValueUnit(2);
+      final sum = CompositeUnit(() => a.value + b.value);
 
       expect(sum.value, 3);
 
       a.dispose();
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         a.value = 100; // Ignored
         b.value = 20;
       });
@@ -606,9 +605,9 @@ void main() {
     });
 
     test('interleaved batch and non-batch updates', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -620,7 +619,7 @@ void main() {
       expect(c.value, 1);
       expect(computeCount, 2);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 2;
         s.value = 3;
       });
@@ -636,9 +635,9 @@ void main() {
     });
 
     test('batch with same value updates', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -646,7 +645,7 @@ void main() {
       expect(c.value, 42);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 42; // Same value
         s.value = 42; // Same value
       });
@@ -659,9 +658,9 @@ void main() {
     });
 
     test('batch setting then reverting value', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -669,7 +668,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
         s.value = 2;
         s.value = 0; // Back to original
@@ -689,11 +688,11 @@ void main() {
   // Performance
   // ============================================================================
 
-  group('Signal.batch - Performance', () {
+  group('ValueUnit.batch - Performance', () {
     test('many signals in single batch', () {
-      final signals = List.generate(100, (i) => Signal(0));
+      final signals = List.generate(100, (i) => ValueUnit(0));
       var computeCount = 0;
-      final sum = Computed(() {
+      final sum = CompositeUnit(() {
         computeCount++;
         return signals.fold<int>(0, (sum, s) => sum + s.value);
       });
@@ -701,7 +700,7 @@ void main() {
       expect(sum.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         for (var i = 0; i < 100; i++) {
           signals[i].value = i + 1;
         }
@@ -717,9 +716,9 @@ void main() {
     });
 
     test('many updates to single signal in batch', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -727,7 +726,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         for (var i = 0; i < 1000; i++) {
           s.value = i;
         }
@@ -741,11 +740,11 @@ void main() {
     });
 
     test('batch with many computeds', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var totalComputeCount = 0;
 
       final computeds = List.generate(50, (i) {
-        return Computed(() {
+        return CompositeUnit(() {
           totalComputeCount++;
           return s.value + i;
         });
@@ -757,7 +756,7 @@ void main() {
       }
       expect(totalComputeCount, 50);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 100;
         s.value = 200;
       });
@@ -774,9 +773,9 @@ void main() {
     });
 
     test('deeply nested batch performance', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -789,13 +788,13 @@ void main() {
           s.value = depth;
           return;
         }
-        Signal.batch(() {
+        ValueUnit.batch(() {
           s.value = depth;
           nestedBatch(depth + 1, maxDepth);
         });
       }
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         nestedBatch(1, 20);
       });
 
@@ -811,16 +810,16 @@ void main() {
   // Complex Scenarios
   // ============================================================================
 
-  group('Signal.batch - Complex Scenarios', () {
+  group('ValueUnit.batch - Complex Scenarios', () {
     test('batch with computed chain', () {
-      final s = Signal(1);
-      final c1 = Computed(() => s.value * 2);
-      final c2 = Computed(() => c1.value * 2);
-      final c3 = Computed(() => c2.value * 2);
+      final s = ValueUnit(1);
+      final c1 = CompositeUnit(() => s.value * 2);
+      final c2 = CompositeUnit(() => c1.value * 2);
+      final c3 = CompositeUnit(() => c2.value * 2);
 
       expect(c3.value, 8);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 2;
         s.value = 3;
         s.value = 4;
@@ -836,15 +835,15 @@ void main() {
     });
 
     test('batch with diamond and chain', () {
-      final source = Signal(1);
-      final left = Computed(() => source.value + 1);
-      final right = Computed(() => source.value + 2);
-      final middle = Computed(() => left.value + right.value);
-      final end = Computed(() => middle.value * 2);
+      final source = ValueUnit(1);
+      final left = CompositeUnit(() => source.value + 1);
+      final right = CompositeUnit(() => source.value + 2);
+      final middle = CompositeUnit(() => left.value + right.value);
+      final end = CompositeUnit(() => middle.value * 2);
 
       expect(end.value, 10); // ((1+1)+(1+2))*2 = 10
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         source.value = 10;
         source.value = 20;
       });
@@ -859,12 +858,12 @@ void main() {
     });
 
     test('batch with conditional computed', () {
-      final condition = Signal(true);
-      final a = Signal(1);
-      final b = Signal(2);
+      final condition = ValueUnit(true);
+      final a = ValueUnit(1);
+      final b = ValueUnit(2);
       var computeCount = 0;
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return condition.value ? a.value : b.value;
       });
@@ -872,7 +871,7 @@ void main() {
       expect(c.value, 1);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         a.value = 10;
         b.value = 20;
         condition.value = false;
@@ -888,9 +887,9 @@ void main() {
     });
 
     test('batch does not affect reading', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
 
-      final result = Signal.batch(() {
+      final result = ValueUnit.batch(() {
         s.value = 1;
         final v1 = s.value;
         s.value = 2;
@@ -907,9 +906,9 @@ void main() {
     });
 
     test('multiple batches in sequence', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -917,19 +916,19 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 1;
       });
       expect(c.value, 1);
       expect(computeCount, 2);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 2;
       });
       expect(c.value, 2);
       expect(computeCount, 3);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s.value = 3;
       });
       expect(c.value, 3);
@@ -940,12 +939,12 @@ void main() {
     });
 
     test('batch with async-like pattern (sync execution)', () {
-      final s = Signal(0);
-      final c = Computed(() => s.value);
+      final s = ValueUnit(0);
+      final c = CompositeUnit(() => s.value);
 
       expect(c.value, 0);
 
-      final result = Signal.batch(() {
+      final result = ValueUnit.batch(() {
         s.value = 1;
         // Simulate async-like step by step updates
         s.value = 2;
@@ -961,11 +960,11 @@ void main() {
     });
 
     test('batch preserves update order', () {
-      final a = Signal(0);
-      final b = Signal(0);
+      final a = ValueUnit(0);
+      final b = ValueUnit(0);
       final history = <String>[];
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         history.add('a=${a.value}, b=${b.value}');
         return a.value + b.value;
       });
@@ -973,7 +972,7 @@ void main() {
       expect(c.value, 0);
       expect(history, ['a=0, b=0']);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         a.value = 1;
         b.value = 2;
       });
@@ -987,12 +986,12 @@ void main() {
     });
 
     test('batch with list signal updates', () {
-      final list = Signal<List<int>>([1, 2, 3]);
-      final sum = Computed(() => list.value.fold<int>(0, (a, b) => a + b));
+      final list = ValueUnit<List<int>>([1, 2, 3]);
+      final sum = CompositeUnit(() => list.value.fold<int>(0, (a, b) => a + b));
 
       expect(sum.value, 6);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         list.value = [4, 5, 6];
         list.value = [7, 8, 9];
       });
@@ -1004,9 +1003,9 @@ void main() {
     });
 
     test('batch with boolean signal toggles', () {
-      final toggle = Signal(false);
+      final toggle = ValueUnit(false);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return toggle.value;
       });
@@ -1014,7 +1013,7 @@ void main() {
       expect(c.value, false);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         toggle.value = true;
         toggle.value = false;
         toggle.value = true;
@@ -1030,12 +1029,12 @@ void main() {
     });
 
     test('batch with string signal updates', () {
-      final text = Signal('hello');
-      final length = Computed(() => text.value.length);
+      final text = ValueUnit('hello');
+      final length = CompositeUnit(() => text.value.length);
 
       expect(length.value, 5);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         text.value = 'world';
         text.value = 'hello world';
       });
@@ -1047,12 +1046,12 @@ void main() {
     });
 
     test('batch with map signal', () {
-      final map = Signal<Map<String, int>>({'a': 1});
-      final keys = Computed(() => map.value.keys.toList()..sort());
+      final map = ValueUnit<Map<String, int>>({'a': 1});
+      final keys = CompositeUnit(() => map.value.keys.toList()..sort());
 
       expect(keys.value, ['a']);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         map.value = {'a': 1, 'b': 2};
         map.value = {'a': 1, 'b': 2, 'c': 3};
       });
@@ -1064,16 +1063,16 @@ void main() {
     });
 
     test('batch does not affect unrelated signals', () {
-      final s1 = Signal(0);
-      final s2 = Signal(0);
+      final s1 = ValueUnit(0);
+      final s2 = ValueUnit(0);
       var c1Count = 0;
       var c2Count = 0;
 
-      final c1 = Computed(() {
+      final c1 = CompositeUnit(() {
         c1Count++;
         return s1.value;
       });
-      final c2 = Computed(() {
+      final c2 = CompositeUnit(() {
         c2Count++;
         return s2.value;
       });
@@ -1084,7 +1083,7 @@ void main() {
       expect(c2Count, 1);
 
       // Batch only updates s1
-      Signal.batch(() {
+      ValueUnit.batch(() {
         s1.value = 1;
         s1.value = 2;
       });
@@ -1101,9 +1100,9 @@ void main() {
     });
 
     test('batch with counter pattern', () {
-      final counter = Signal(0);
+      final counter = ValueUnit(0);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return counter.value;
       });
@@ -1111,7 +1110,7 @@ void main() {
       expect(c.value, 0);
       expect(computeCount, 1);
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         for (var i = 0; i < 100; i++) {
           counter.update((v) => v + 1);
         }
@@ -1125,35 +1124,35 @@ void main() {
     });
 
     test('batch return type preserved', () {
-      final intResult = Signal.batch(() => 42);
+      final intResult = ValueUnit.batch(() => 42);
       expect(intResult, isA<int>());
       expect(intResult, 42);
 
-      final stringResult = Signal.batch(() => 'hello');
+      final stringResult = ValueUnit.batch(() => 'hello');
       expect(stringResult, isA<String>());
       expect(stringResult, 'hello');
 
-      final listResult = Signal.batch(() => [1, 2, 3]);
+      final listResult = ValueUnit.batch(() => [1, 2, 3]);
       expect(listResult, isA<List<int>>());
       expect(listResult, [1, 2, 3]);
 
-      final mapResult = Signal.batch(() => {'a': 1});
+      final mapResult = ValueUnit.batch(() => {'a': 1});
       expect(mapResult, isA<Map<String, int>>());
       expect(mapResult, {'a': 1});
     });
 
     test('batch with complex dependency graph', () {
-      final a = Signal(1);
-      final b = Signal(2);
-      final c = Signal(3);
+      final a = ValueUnit(1);
+      final b = ValueUnit(2);
+      final c = ValueUnit(3);
 
-      final ab = Computed(() => a.value + b.value);
-      final bc = Computed(() => b.value + c.value);
-      final abc = Computed(() => ab.value + bc.value - b.value);
+      final ab = CompositeUnit(() => a.value + b.value);
+      final bc = CompositeUnit(() => b.value + c.value);
+      final abc = CompositeUnit(() => ab.value + bc.value - b.value);
 
       expect(abc.value, 6); // a + b + c = 1 + 2 + 3
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         a.value = 10;
         b.value = 20;
         c.value = 30;
@@ -1170,15 +1169,16 @@ void main() {
     });
 
     test('batch with mixed types', () {
-      final num = Signal(42);
-      final text = Signal('hello');
-      final flag = Signal(true);
+      final num = ValueUnit(42);
+      final text = ValueUnit('hello');
+      final flag = ValueUnit(true);
 
-      final result = Computed(() => '${num.value}-${text.value}-${flag.value}');
+      final result =
+          CompositeUnit(() => '${num.value}-${text.value}-${flag.value}');
 
       expect(result.value, '42-hello-true');
 
-      Signal.batch(() {
+      ValueUnit.batch(() {
         num.value = 100;
         text.value = 'world';
         flag.value = false;

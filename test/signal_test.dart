@@ -1,4 +1,4 @@
-import 'package:pureflow/pureflow.dart';
+import 'package:pureflow/src/listenable/listenable.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -6,54 +6,54 @@ void main() {
   // Basic Operations
   // ============================================================================
 
-  group('Signal - Basic Operations', () {
+  group('ValueUnit - Basic Operations', () {
     test('creates signal with initial int value', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       expect(s.value, 42);
       s.dispose();
     });
 
     test('creates signal with initial double value', () {
-      final s = Signal(3.14);
+      final s = ValueUnit(3.14);
       expect(s.value, 3.14);
       s.dispose();
     });
 
     test('creates signal with initial String value', () {
-      final s = Signal('hello');
+      final s = ValueUnit('hello');
       expect(s.value, 'hello');
       s.dispose();
     });
 
     test('creates signal with initial bool value', () {
-      final s = Signal(true);
+      final s = ValueUnit(true);
       expect(s.value, true);
       s.dispose();
     });
 
     test('reads value via getter', () {
-      final s = Signal(100);
+      final s = ValueUnit(100);
       final value = s.value;
       expect(value, 100);
       s.dispose();
     });
 
     test('writes value via setter', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       s.value = 999;
       expect(s.value, 999);
       s.dispose();
     });
 
     test('updates value using update function', () {
-      final s = Signal(10);
+      final s = ValueUnit(10);
       s.update((v) => v * 2);
       expect(s.value, 20);
       s.dispose();
     });
 
     test('update function receives current value', () {
-      final s = Signal(5);
+      final s = ValueUnit(5);
       int? received;
       s.update((v) {
         received = v;
@@ -65,7 +65,7 @@ void main() {
     });
 
     test('multiple sequential updates', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       s.value = 1;
       s.value = 2;
       s.value = 3;
@@ -76,7 +76,7 @@ void main() {
     });
 
     test('dispose signal', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       s.dispose();
       // Should not throw
       expect(s.value, 42);
@@ -87,35 +87,35 @@ void main() {
   // Value Types
   // ============================================================================
 
-  group('Signal - Value Types', () {
+  group('ValueUnit - Value Types', () {
     test('handles nullable int type with non-null value', () {
-      final s = Signal<int?>(42);
+      final s = ValueUnit<int?>(42);
       expect(s.value, 42);
       s.dispose();
     });
 
     test('handles nullable int type with null value', () {
-      final s = Signal<int?>(null);
+      final s = ValueUnit<int?>(null);
       expect(s.value, isNull);
       s.dispose();
     });
 
     test('transitions from value to null', () {
-      final s = Signal<int?>(42);
+      final s = ValueUnit<int?>(42);
       s.value = null;
       expect(s.value, isNull);
       s.dispose();
     });
 
     test('transitions from null to value', () {
-      final s = Signal<int?>(null);
+      final s = ValueUnit<int?>(null);
       s.value = 42;
       expect(s.value, 42);
       s.dispose();
     });
 
     test('handles List values', () {
-      final s = Signal<List<int>>([1, 2, 3]);
+      final s = ValueUnit<List<int>>([1, 2, 3]);
       expect(s.value, [1, 2, 3]);
       s.value = [4, 5, 6];
       expect(s.value, [4, 5, 6]);
@@ -123,13 +123,13 @@ void main() {
     });
 
     test('handles Set values', () {
-      final s = Signal<Set<String>>({'a', 'b', 'c'});
+      final s = ValueUnit<Set<String>>({'a', 'b', 'c'});
       expect(s.value, {'a', 'b', 'c'});
       s.dispose();
     });
 
     test('handles Map values', () {
-      final s = Signal<Map<String, int>>({'a': 1, 'b': 2});
+      final s = ValueUnit<Map<String, int>>({'a': 1, 'b': 2});
       expect(s.value, {'a': 1, 'b': 2});
       s.value = {'c': 3};
       expect(s.value, {'c': 3});
@@ -138,7 +138,7 @@ void main() {
 
     test('handles custom object values', () {
       final obj = _TestObject(1, 'test');
-      final s = Signal(obj);
+      final s = ValueUnit(obj);
       expect(s.value, obj);
       expect(s.value.id, 1);
       expect(s.value.name, 'test');
@@ -146,7 +146,7 @@ void main() {
     });
 
     test('handles empty string', () {
-      final s = Signal('');
+      final s = ValueUnit('');
       expect(s.value, '');
       s.value = 'not empty';
       expect(s.value, 'not empty');
@@ -156,13 +156,13 @@ void main() {
     });
 
     test('handles very large numbers', () {
-      final s = Signal(9007199254740992); // 2^53
+      final s = ValueUnit(9007199254740992); // 2^53
       expect(s.value, 9007199254740992);
       s.dispose();
     });
 
     test('handles negative numbers', () {
-      final s = Signal(-999);
+      final s = ValueUnit(-999);
       expect(s.value, -999);
       s.value = -1;
       expect(s.value, -1);
@@ -170,13 +170,13 @@ void main() {
     });
 
     test('handles double infinity', () {
-      final s = Signal(double.infinity);
+      final s = ValueUnit(double.infinity);
       expect(s.value, double.infinity);
       s.dispose();
     });
 
     test('handles double negative infinity', () {
-      final s = Signal(double.negativeInfinity);
+      final s = ValueUnit(double.negativeInfinity);
       expect(s.value, double.negativeInfinity);
       s.dispose();
     });
@@ -186,11 +186,11 @@ void main() {
   // Equality Behavior
   // ============================================================================
 
-  group('Signal - Equality Behavior', () {
+  group('ValueUnit - Equality Behavior', () {
     test('same int value does not trigger computed recomputation', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -207,9 +207,9 @@ void main() {
     });
 
     test('same String value does not trigger update', () {
-      final s = Signal('hello');
+      final s = ValueUnit('hello');
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -227,9 +227,9 @@ void main() {
 
     test('identical object does not trigger update', () {
       final obj = _TestObject(1, 'test');
-      final s = Signal(obj);
+      final s = ValueUnit(obj);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -246,9 +246,9 @@ void main() {
     });
 
     test('equal but not identical List triggers update', () {
-      final s = Signal<List<int>>([1, 2, 3]);
+      final s = ValueUnit<List<int>>([1, 2, 3]);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -266,7 +266,7 @@ void main() {
     });
 
     test('double NaN handling', () {
-      final s = Signal(double.nan);
+      final s = ValueUnit(double.nan);
       expect(s.value.isNaN, true);
 
       // NaN != NaN, but identical check should work
@@ -276,7 +276,7 @@ void main() {
     });
 
     test('zero and negative zero', () {
-      final s = Signal(0.0);
+      final s = ValueUnit(0.0);
       expect(s.value, 0.0);
       s.value = -0.0;
       // 0.0 == -0.0 in Dart
@@ -289,30 +289,30 @@ void main() {
   // Dispose Behavior
   // ============================================================================
 
-  group('Signal - Dispose Behavior', () {
+  group('ValueUnit - Dispose Behavior', () {
     test('disposed signal ignores writes', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       s.dispose();
       s.value = 100; // Should be ignored
       expect(s.value, 42);
     });
 
     test('disposed signal is still readable', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       s.dispose();
       expect(s.value, 42);
     });
 
     test('double dispose is safe', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       s.dispose();
       s.dispose(); // Should not throw
       expect(s.value, 42);
     });
 
     test('dispose with active computed dependent', () {
-      final s = Signal(42);
-      final c = Computed(() => s.value * 2);
+      final s = ValueUnit(42);
+      final c = CompositeUnit(() => s.value * 2);
       expect(c.value, 84);
 
       s.dispose();
@@ -323,15 +323,15 @@ void main() {
     });
 
     test('update function ignored after dispose', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       s.dispose();
       s.update((v) => v * 2);
       expect(s.value, 42); // Should remain unchanged
     });
 
     test('dispose breaks dependency chain', () {
-      final s = Signal(1);
-      final c = Computed(() => s.value * 10);
+      final s = ValueUnit(1);
+      final c = CompositeUnit(() => s.value * 10);
       expect(c.value, 10);
 
       s.dispose();
@@ -348,7 +348,7 @@ void main() {
   // Edge Cases
   // ============================================================================
 
-  group('Signal - Edge Cases', () {
+  group('ValueUnit - Edge Cases', () {
     test('signal with deeply nested object', () {
       final nested = {
         'level1': {
@@ -357,14 +357,14 @@ void main() {
           }
         }
       };
-      final s = Signal(nested);
+      final s = ValueUnit(nested);
       expect(s.value['level1']!['level2']!['level3']!['value'], 42);
       s.dispose();
     });
 
     test('signal as value of another signal', () {
-      final inner = Signal(42);
-      final outer = Signal(inner);
+      final inner = ValueUnit(42);
+      final outer = ValueUnit(inner);
 
       expect(outer.value.value, 42);
       inner.value = 100;
@@ -375,9 +375,9 @@ void main() {
     });
 
     test('multiple signals with same initial value', () {
-      final s1 = Signal(42);
-      final s2 = Signal(42);
-      final s3 = Signal(42);
+      final s1 = ValueUnit(42);
+      final s2 = ValueUnit(42);
+      final s3 = ValueUnit(42);
 
       expect(s1.value, 42);
       expect(s2.value, 42);
@@ -396,7 +396,7 @@ void main() {
     });
 
     test('rapid value changes', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       for (var i = 1; i <= 1000; i++) {
         s.value = i;
       }
@@ -406,7 +406,7 @@ void main() {
 
     test('signal with function type', () {
       int Function(int) fn(int multiplier) => (x) => x * multiplier;
-      final s = Signal(fn(2));
+      final s = ValueUnit(fn(2));
       expect(s.value(5), 10);
 
       s.value = fn(3);
@@ -415,14 +415,14 @@ void main() {
     });
 
     test('signal with Future type', () async {
-      final s = Signal(Future.value(42));
+      final s = ValueUnit(Future.value(42));
       expect(await s.value, 42);
       s.dispose();
     });
 
     test('signal with DateTime', () {
       final now = DateTime.now();
-      final s = Signal(now);
+      final s = ValueUnit(now);
       expect(s.value, now);
 
       final later = now.add(const Duration(hours: 1));
@@ -432,7 +432,7 @@ void main() {
     });
 
     test('signal with Duration', () {
-      final s = Signal(const Duration(seconds: 30));
+      final s = ValueUnit(const Duration(seconds: 30));
       expect(s.value.inSeconds, 30);
       s.value = const Duration(minutes: 1);
       expect(s.value.inSeconds, 60);
@@ -440,7 +440,7 @@ void main() {
     });
 
     test('signal with enum value', () {
-      final s = Signal(_TestEnum.first);
+      final s = ValueUnit(_TestEnum.first);
       expect(s.value, _TestEnum.first);
       s.value = _TestEnum.second;
       expect(s.value, _TestEnum.second);
@@ -449,20 +449,20 @@ void main() {
 
     test('signal preserves object identity', () {
       final obj = _TestObject(1, 'test');
-      final s = Signal(obj);
+      final s = ValueUnit(obj);
       expect(identical(s.value, obj), true);
       s.dispose();
     });
 
     test('concurrent reads return same value', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       final values = List.generate(100, (_) => s.value);
       expect(values.every((v) => v == 42), true);
       s.dispose();
     });
 
     test('signal with record type', () {
-      final s = Signal<(int, String)>((1, 'hello'));
+      final s = ValueUnit<(int, String)>((1, 'hello'));
       expect(s.value.$1, 1);
       expect(s.value.$2, 'hello');
       s.value = (2, 'world');
@@ -473,13 +473,13 @@ void main() {
   });
 
   // ============================================================================
-  // Computed Integration
+  // CompositeView Integration
   // ============================================================================
 
-  group('Signal - Computed Integration', () {
+  group('ValueUnit - CompositeView Integration', () {
     test('computed tracks signal dependency', () {
-      final s = Signal(10);
-      final c = Computed(() => s.value * 2);
+      final s = ValueUnit(10);
+      final c = CompositeUnit(() => s.value * 2);
 
       expect(c.value, 20);
       s.value = 15;
@@ -490,10 +490,10 @@ void main() {
     });
 
     test('multiple computeds from single signal', () {
-      final s = Signal(10);
-      final c1 = Computed(() => s.value + 1);
-      final c2 = Computed(() => s.value + 2);
-      final c3 = Computed(() => s.value + 3);
+      final s = ValueUnit(10);
+      final c1 = CompositeUnit(() => s.value + 1);
+      final c2 = CompositeUnit(() => s.value + 2);
+      final c3 = CompositeUnit(() => s.value + 3);
 
       expect(c1.value, 11);
       expect(c2.value, 12);
@@ -512,10 +512,10 @@ void main() {
     });
 
     test('signal update propagates through chain', () {
-      final s = Signal(1);
-      final c1 = Computed(() => s.value + 1);
-      final c2 = Computed(() => c1.value + 1);
-      final c3 = Computed(() => c2.value + 1);
+      final s = ValueUnit(1);
+      final c1 = CompositeUnit(() => s.value + 1);
+      final c2 = CompositeUnit(() => c1.value + 1);
+      final c3 = CompositeUnit(() => c2.value + 1);
 
       expect(c3.value, 4);
       s.value = 10;
@@ -528,7 +528,7 @@ void main() {
     });
 
     test('reading signal outside computed does not create dependency', () {
-      final s = Signal(42);
+      final s = ValueUnit(42);
       final value = s.value; // Read outside computed
 
       expect(value, 42);

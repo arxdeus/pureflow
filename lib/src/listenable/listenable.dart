@@ -13,7 +13,7 @@ typedef VoidCallback = void Function();
 const int _disposedBit = 1 << 0;
 const int _notifyingBit = 1 << 1;
 
-/// Bit flags for ValueView status.
+/// Bit flags for CompositeView status.
 const int _dirtyBit = 1 << 0;
 const int _runningBit = 1 << 1;
 const int _viewDisposedBit = 1 << 2;
@@ -22,26 +22,31 @@ const int _viewDisposedBit = 1 << 2;
 // Global State for Reactive System
 // ============================================================================
 
-/// Currently evaluating ValueView (for dependency tracking).
-ValueView<Object?>? _currentView;
+/// Currently evaluating CompositeView (for dependency tracking).
+CompositeUnit<Object?>? _currentView;
 
 /// Current batch depth for batched updates.
 int _batchDepth = 0;
 
-/// Signals that changed during batch.
-List<ValueNotifier<Object?>>? _batchedSignals;
+/// Pre-allocated batch buffer for better performance.
+final List<ValueUnit<Object?>?> _batchBuffer =
+    List.filled(64, null, growable: true);
+int _batchCount = 0;
+
+/// Object pool for _DependencyNode to reduce allocations.
+_DependencyNode? _nodePool;
 
 // ============================================================================
 // Dependency Node (Optimized for reactive tracking only)
 // ============================================================================
 
-/// Node for tracking dependencies between sources and ValueViews.
+/// Node for tracking dependencies between sources and CompositeViews.
 class _DependencyNode {
   /// The source this dependency is attached to.
   _ReactiveSource<Object?> source;
 
-  /// Target ValueView that depends on the source.
-  ValueView<Object?> target;
+  /// Target CompositeView that depends on the source.
+  CompositeUnit<Object?> target;
 
   /// Whether this dependency is still active (false = recyclable).
   bool isActive = true;
@@ -61,24 +66,58 @@ class _DependencyNode {
 }
 
 // ============================================================================
-// Listenable Interface
+// Object Pool for _DependencyNode
+// ============================================================================
+
+/// Acquires a node from the pool or creates a new one.
+@pragma('vm:prefer-inline')
+_DependencyNode _acquireNode(
+  _ReactiveSource<Object?> source,
+  CompositeUnit<Object?> target,
+) {
+  final pooled = _nodePool;
+  if (pooled != null) {
+    _nodePool = pooled.next;
+    pooled
+      ..source = source
+      ..target = target
+      ..isActive = true
+      ..prev = null
+      ..next = null
+      ..prevSource = null
+      ..nextSource = null
+      ..rollback = null;
+    return pooled;
+  }
+  return _DependencyNode(source: source, target: target);
+}
+
+/// Returns a node to the pool for reuse.
+@pragma('vm:prefer-inline')
+void _releaseNode(_DependencyNode node) {
+  node.next = _nodePool;
+  _nodePool = node;
+}
+
+// ============================================================================
+// Observable Interface
 // ============================================================================
 
 /// An object that maintains a list of listeners.
-abstract class Listenable {
-  const Listenable();
+abstract class Observable {
+  const Observable();
 
-  factory Listenable.merge(Iterable<Listenable?> listenables) =
-      _MergingListenable;
+  factory Observable.merge(Iterable<Observable?> observables) =
+      _MergingObservable;
 
   void addListener(VoidCallback listener);
   void removeListener(VoidCallback listener);
 }
 
-class _MergingListenable extends Listenable {
-  _MergingListenable(this._children);
+class _MergingObservable extends Observable {
+  _MergingObservable(this._children);
 
-  final Iterable<Listenable?> _children;
+  final Iterable<Observable?> _children;
 
   @override
   void addListener(VoidCallback listener) {
@@ -95,10 +134,10 @@ class _MergingListenable extends Listenable {
   }
 
   @override
-  String toString() => 'Listenable.merge([${_children.join(", ")}])';
+  String toString() => 'Observable.merge([${_children.join(", ")}])';
 }
 
-abstract class ValueListenable<T> extends Listenable {
+abstract class ValueHolder<T> extends Observable {
   T get value;
 }
 
@@ -122,8 +161,7 @@ class _ListenerNode {
 /// Base class for reactive sources with optimized subscription system.
 ///
 /// Uses separate linked lists for callback listeners and reactive dependencies.
-abstract class _ReactiveSource<T> extends Stream<T>
-    implements ValueListenable<T> {
+abstract class _ReactiveSource<T> extends Stream<T> implements ValueHolder<T> {
   /// Head of linked list of callback listeners.
   _ListenerNode? _listeners;
 
@@ -215,32 +253,16 @@ abstract class _ReactiveSource<T> extends Stream<T>
   // Reactive Dependency Tracking
   // --------------------------------------------------------------------------
 
-  /// Registers this source as a dependency of the given ValueView.
+  /// Registers this source as a dependency of the given CompositeView.
   @pragma('vm:prefer-inline')
-  void _trackDependency(ValueView<Object?> targetView) {
-    var node = _trackingNode;
+  void _trackDependency(CompositeUnit<Object?> targetView) {
+    final node = _trackingNode;
 
-    if (node == null || node.target != targetView) {
-      // New dependency - create node and link to target's source list
-      node = _DependencyNode(
-        source: this,
-        target: targetView,
-      )
-        ..prevSource = targetView._sourceDeps
-        ..rollback = _trackingNode;
-
-      if (targetView._sourceDeps != null) {
-        targetView._sourceDeps!.nextSource = node;
-      }
-      targetView._sourceDeps = node;
-      _trackingNode = node;
-
-      // Subscribe to this source
-      _addDependencyNode(node);
-    } else if (!node.isActive) {
+    // Fast path: existing active node for this target
+    if (node != null && node.target == targetView) {
+      if (node.isActive) return;
       // Reuse existing node
       node.isActive = true;
-
       // Move to end of source list if not already there
       if (node.nextSource != null) {
         node.nextSource!.prevSource = node.prevSource;
@@ -252,7 +274,32 @@ abstract class _ReactiveSource<T> extends Stream<T>
         targetView._sourceDeps!.nextSource = node;
         targetView._sourceDeps = node;
       }
+      return;
     }
+
+    // Slow path: create new dependency
+    _trackDependencySlow(targetView, node);
+  }
+
+  /// Slow path for creating new dependencies.
+  @pragma('vm:never-inline')
+  void _trackDependencySlow(
+    CompositeUnit<Object?> targetView,
+    _DependencyNode? oldNode,
+  ) {
+    // New dependency - acquire node from pool and link to target's source list
+    final node = _acquireNode(this, targetView)
+      ..prevSource = targetView._sourceDeps
+      ..rollback = oldNode;
+
+    if (targetView._sourceDeps != null) {
+      targetView._sourceDeps!.nextSource = node;
+    }
+    targetView._sourceDeps = node;
+    _trackingNode = node;
+
+    // Subscribe to this source
+    _addDependencyNode(node);
   }
 
   // --------------------------------------------------------------------------
@@ -263,22 +310,20 @@ abstract class _ReactiveSource<T> extends Stream<T>
   @protected
   @pragma('vm:prefer-inline')
   void notifySubscribers() {
-    // Guard against recursive notification
+    // Guard against recursive notification (inline bit check)
     if ((_status & _notifyingBit) != 0) return;
-    _status |= _notifyingBit;
+    _status = _status | _notifyingBit;
 
-    try {
-      // Notify callback listeners
-      for (var node = _listeners; node != null; node = node.next) {
-        node.callback();
-      }
-      // Mark dependent ValueViews as dirty
-      for (var node = _dependencies; node != null; node = node.next) {
-        node.target._markDirty();
-      }
-    } finally {
-      _status &= ~_notifyingBit;
+    // Notify callback listeners
+    for (var node = _listeners; node != null; node = node.next) {
+      node.callback();
     }
+    // Mark dependent CompositeViews as dirty
+    for (var node = _dependencies; node != null; node = node.next) {
+      node.target._markDirty();
+    }
+
+    _status = _status & ~_notifyingBit;
   }
 
   // --------------------------------------------------------------------------
@@ -303,8 +348,9 @@ abstract class _ReactiveSource<T> extends Stream<T>
 
   @mustCallSuper
   void dispose() {
+    // Inline bit check
     if ((_status & _disposedBit) != 0) return;
-    _status |= _disposedBit;
+    _status = _status | _disposedBit;
     _listeners = null;
     _dependencies = null;
     _trackingNode = null;
@@ -324,7 +370,7 @@ class _ReactiveSubscription<T> implements StreamSubscription<T> {
     void Function()? onDone,
   )   : _onData = onData,
         _onDone = onDone {
-    // Check if source is already disposed
+    // Check if source is already disposed - inline
     if ((_source._status & _disposedBit) != 0) {
       _onSourceDisposed();
       return;
@@ -405,15 +451,15 @@ class _ReactiveSubscription<T> implements StreamSubscription<T> {
 }
 
 // ============================================================================
-// ValueNotifier (Signal) - Optimized
+// ValueUnit (Signal) - Optimized
 // ============================================================================
 
 /// A reactive signal that holds a single value.
 ///
 /// Uses optimized subscription system for both callback listeners
 /// and reactive dependencies.
-class ValueNotifier<T> extends _ReactiveSource<T> {
-  ValueNotifier(this._value);
+class ValueUnit<T> extends _ReactiveSource<T> {
+  ValueUnit(this._value);
 
   T _value;
   bool _inBatch = false;
@@ -433,19 +479,18 @@ class ValueNotifier<T> extends _ReactiveSource<T> {
 
   @pragma('vm:prefer-inline')
   static void _flushBatch() {
-    final signals = _batchedSignals;
-    if (signals == null) return;
-    final length = signals.length;
-    if (length == 0) return;
+    final count = _batchCount;
+    if (count == 0) return;
 
-    for (var i = 0; i < length; i++) {
-      final signal = signals[i];
+    for (var i = 0; i < count; i++) {
+      final signal = _batchBuffer[i]!;
       signal._inBatch = false;
       if ((signal._status & _disposedBit) == 0) {
         signal.notifySubscribers();
       }
+      _batchBuffer[i] = null; // Avoid memory leak
     }
-    signals.clear();
+    _batchCount = 0;
   }
 
   @override
@@ -461,18 +506,24 @@ class ValueNotifier<T> extends _ReactiveSource<T> {
 
   @pragma('vm:prefer-inline')
   set value(T newValue) {
-    if ((_status & _disposedBit) != 0 ||
-        identical(_value, newValue) ||
-        _value == newValue) {
-      return;
-    }
+    // Fastest check first: reference equality
+    if (identical(_value, newValue)) return;
+    // Then disposed check (cheap bit operation)
+    if ((_status & _disposedBit) != 0) return;
+    // Finally value equality (potentially expensive)
+    if (_value == newValue) return;
+
     _value = newValue;
 
     // Handle batching - defer notification
     if (_batchDepth > 0) {
       if (!_inBatch) {
         _inBatch = true;
-        (_batchedSignals ??= []).add(this);
+        // Use pre-allocated buffer, grow if needed
+        if (_batchCount >= _batchBuffer.length) {
+          _batchBuffer.length *= 2;
+        }
+        _batchBuffer[_batchCount++] = this;
       }
       return;
     }
@@ -486,19 +537,19 @@ class ValueNotifier<T> extends _ReactiveSource<T> {
   void update(T Function(T) updater) => value = updater(_value);
 
   @override
-  String toString() => 'ValueNotifier<$T>($_value)';
+  String toString() => 'ValueUnit<$T>($_value)';
 }
 
 // ============================================================================
-// ValueView (Computed) - Optimized with bit flags
+// CompositeView (Computed) - Optimized with bit flags
 // ============================================================================
 
 /// A computed value that automatically tracks its dependencies.
 ///
-/// ValueView lazily recomputes its value when dependencies change.
+/// CompositeView lazily recomputes its value when dependencies change.
 /// Uses optimized subscription system with bit flags for status.
-class ValueView<T> extends _ReactiveSource<T> {
-  ValueView(this._compute);
+class CompositeUnit<T> extends _ReactiveSource<T> {
+  CompositeUnit(this._compute);
 
   final T Function() _compute;
   late T _value;
@@ -514,17 +565,17 @@ class ValueView<T> extends _ReactiveSource<T> {
   T get value {
     final status = _viewStatus;
 
-    // Check for cycle (running bit set)
+    // Check for cycle (running bit set) - inline
     if ((status & _runningBit) != 0) {
-      throw StateError('Cycle detected in ValueView computation');
+      throw StateError('Cycle detected in CompositeView computation');
     }
 
-    // Recompute if dirty
+    // Recompute if dirty - inline
     if ((status & _dirtyBit) != 0) {
       _recompute();
     }
 
-    // Track self as dependency if inside another ValueView and not disposed
+    // Track self as dependency if inside another CompositeView and not disposed
     if ((status & _viewDisposedBit) == 0) {
       final targetView = _currentView;
       if (targetView != null && !identical(targetView, this)) {
@@ -535,36 +586,36 @@ class ValueView<T> extends _ReactiveSource<T> {
     return _value;
   }
 
-  /// Marks this ValueView as needing recomputation.
+  /// Marks this CompositeView as needing recomputation.
   @pragma('vm:prefer-inline')
   void _markDirty() {
     final status = _viewStatus;
-    // Already dirty or disposed - skip
+    // Already dirty or disposed - skip (inline combined check)
     if ((status & (_dirtyBit | _viewDisposedBit)) != 0) return;
     _viewStatus = status | _dirtyBit;
 
-    // Notify all subscribers (listeners + dependent ValueViews)
+    // Notify all subscribers (listeners + dependent CompositeViews)
     notifySubscribers();
   }
 
   void _recompute() {
     final status = _viewStatus;
 
-    // If disposed, just compute without tracking
+    // If disposed, just compute without tracking - inline
     if ((status & _viewDisposedBit) != 0) {
       _value = _compute();
       _viewStatus = status & ~_dirtyBit;
       return;
     }
 
-    // Mark as running
+    // Mark as running - inline
     _viewStatus = status | _runningBit;
 
     // Prepare existing dependencies for reuse
     _prepareDependencies();
 
     final previousView = _currentView;
-    _currentView = this as ValueView<Object?>;
+    _currentView = this as CompositeUnit<Object?>;
 
     try {
       _value = _compute();
@@ -599,10 +650,16 @@ class ValueView<T> extends _ReactiveSource<T> {
 
     while (node != null) {
       final prevNode = node.prevSource;
+      final shouldRemove = disposeAll || !node.isActive;
 
-      if (disposeAll || !node.isActive) {
+      // Restore rollback node before potentially releasing
+      final source = node.source;
+      source._trackingNode = node.rollback;
+      node.rollback = null;
+
+      if (shouldRemove) {
         // Unsubscribe from source
-        node.source._removeDependencyNode(node);
+        source._removeDependencyNode(node);
 
         // Remove from list
         if (prevNode != null) {
@@ -611,14 +668,12 @@ class ValueView<T> extends _ReactiveSource<T> {
         if (node.nextSource != null) {
           node.nextSource!.prevSource = prevNode;
         }
+
+        // Return node to pool for reuse
+        _releaseNode(node);
       } else {
         headNode = node;
       }
-
-      // Restore rollback node
-      final source = node.source;
-      source._trackingNode = node.rollback;
-      node.rollback = null;
 
       node = prevNode;
     }
@@ -633,7 +688,7 @@ class ValueView<T> extends _ReactiveSource<T> {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
-    // Trigger initial computation to establish dependencies
+    // Trigger initial computation to establish dependencies - inline
     if ((_viewStatus & _dirtyBit) != 0) {
       _recompute();
     }
@@ -642,8 +697,9 @@ class ValueView<T> extends _ReactiveSource<T> {
 
   @override
   void dispose() {
+    // Inline bit check
     if ((_viewStatus & _viewDisposedBit) != 0) return;
-    _viewStatus |= _viewDisposedBit;
+    _viewStatus = _viewStatus | _viewDisposedBit;
     _cleanupDependencies(disposeAll: true);
     _sourceDeps = null;
     super.dispose();
@@ -652,13 +708,14 @@ class ValueView<T> extends _ReactiveSource<T> {
   @override
   String toString() {
     final status = _viewStatus;
+    // Inline bit checks
     if ((status & _viewDisposedBit) != 0) {
-      return 'ValueView<$T>(disposed)';
+      return 'CompositeView<$T>(disposed)';
     }
     if ((status & _dirtyBit) != 0) {
-      return 'ValueView<$T>(dirty)';
+      return 'CompositeView<$T>(dirty)';
     }
-    return 'ValueView<$T>($_value)';
+    return 'CompositeView<$T>($_value)';
   }
 }
 
@@ -668,8 +725,8 @@ class ValueView<T> extends _ReactiveSource<T> {
 
 void main() {
   print('=== Basic Signal/Computed Test ===');
-  final signal = ValueNotifier(0);
-  final computed = ValueView(() => signal.value * 2);
+  final signal = ValueUnit(0);
+  final computed = CompositeUnit(() => signal.value * 2);
 
   print('Initial: signal=${signal.value}, computed=${computed.value}');
 
@@ -680,10 +737,10 @@ void main() {
   print('After signal=5: computed=${computed.value}');
 
   print('\n=== Chained Computed Test ===');
-  final a = ValueNotifier(1);
-  final b = ValueNotifier(2);
-  final sum = ValueView(() => a.value + b.value);
-  final doubled = ValueView(() => sum.value * 2);
+  final a = ValueUnit(1);
+  final b = ValueUnit(2);
+  final sum = CompositeUnit(() => a.value + b.value);
+  final doubled = CompositeUnit(() => sum.value * 2);
 
   print(
       'a=${a.value}, b=${b.value}, sum=${sum.value}, doubled=${doubled.value}');
@@ -693,8 +750,8 @@ void main() {
 
   print('\n=== Batch Test ===');
   var notifyCount = 0;
-  final x = ValueNotifier(0);
-  final y = ValueView(() {
+  final x = ValueUnit(0);
+  final y = CompositeUnit(() {
     notifyCount++;
     return x.value * 10;
   });
@@ -703,7 +760,7 @@ void main() {
   y.value;
   notifyCount = 0;
 
-  ValueNotifier.batch(() {
+  ValueUnit.batch(() {
     x.value = 1;
     x.value = 2;
     x.value = 3;
@@ -713,17 +770,17 @@ void main() {
   print('Recompute count during batch: $notifyCount (should be 1)');
 
   print('\n=== Listener Test ===');
-  final count = ValueNotifier(0);
+  final count = ValueUnit(0);
   count.addListener(() => print('  Listener called: ${count.value}'));
   count.value = 1;
   count.value = 2;
 
   print('\n=== Dynamic Dependency Test ===');
-  final condition = ValueNotifier(true);
-  final valA = ValueNotifier(10);
-  final valB = ValueNotifier(20);
+  final condition = ValueUnit(true);
+  final valA = ValueUnit(10);
+  final valB = ValueUnit(20);
   var computeCount = 0;
-  final dynamic_ = ValueView(() {
+  final dynamic_ = CompositeUnit(() {
     computeCount++;
     return condition.value ? valA.value : valB.value;
   });

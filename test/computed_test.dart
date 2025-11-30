@@ -1,4 +1,4 @@
-import 'package:pureflow/pureflow.dart';
+import 'package:pureflow/src/listenable/listenable.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -6,22 +6,22 @@ void main() {
   // Basic Operations
   // ============================================================================
 
-  group('Computed - Basic Operations', () {
+  group('CompositeView - Basic Operations', () {
     test('creates computed with function', () {
-      final c = Computed(() => 42);
+      final c = CompositeUnit(() => 42);
       expect(c.value, 42);
       c.dispose();
     });
 
     test('creates computed with complex expression', () {
-      final c = Computed(() => (10 + 20) * 2 - 5);
+      final c = CompositeUnit(() => (10 + 20) * 2 - 5);
       expect(c.value, 55);
       c.dispose();
     });
 
     test('reads value multiple times returns same result', () {
       var callCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         callCount++;
         return 42;
       });
@@ -36,7 +36,7 @@ void main() {
 
     test('lazy evaluation - not computed until accessed', () {
       var computed = false;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computed = true;
         return 42;
       });
@@ -49,8 +49,8 @@ void main() {
     });
 
     test('recomputes when dependency changes', () {
-      final s = Signal(10);
-      final c = Computed(() => s.value * 2);
+      final s = ValueUnit(10);
+      final c = CompositeUnit(() => s.value * 2);
 
       expect(c.value, 20);
       s.value = 15;
@@ -61,7 +61,7 @@ void main() {
     });
 
     test('dispose computed', () {
-      final c = Computed(() => 42);
+      final c = CompositeUnit(() => 42);
       c.dispose();
       // Still readable after dispose
       expect(c.value, 42);
@@ -72,11 +72,11 @@ void main() {
   // Dependency Tracking
   // ============================================================================
 
-  group('Computed - Dependency Tracking', () {
+  group('CompositeView - Dependency Tracking', () {
     test('tracks single signal dependency', () {
-      final s = Signal(5);
+      final s = ValueUnit(5);
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -93,9 +93,9 @@ void main() {
     });
 
     test('tracks two signal dependencies', () {
-      final a = Signal(1);
-      final b = Signal(2);
-      final c = Computed(() => a.value + b.value);
+      final a = ValueUnit(1);
+      final b = ValueUnit(2);
+      final c = CompositeUnit(() => a.value + b.value);
 
       expect(c.value, 3);
 
@@ -111,8 +111,9 @@ void main() {
     });
 
     test('tracks five signal dependencies', () {
-      final signals = List.generate(5, (i) => Signal(i + 1));
-      final c = Computed(() => signals.fold<int>(0, (sum, s) => sum + s.value));
+      final signals = List.generate(5, (i) => ValueUnit(i + 1));
+      final c =
+          CompositeUnit(() => signals.fold<int>(0, (sum, s) => sum + s.value));
 
       expect(c.value, 15); // 1+2+3+4+5
 
@@ -126,8 +127,9 @@ void main() {
     });
 
     test('tracks ten signal dependencies', () {
-      final signals = List.generate(10, (i) => Signal(1));
-      final c = Computed(() => signals.fold<int>(0, (sum, s) => sum + s.value));
+      final signals = List.generate(10, (i) => ValueUnit(1));
+      final c =
+          CompositeUnit(() => signals.fold<int>(0, (sum, s) => sum + s.value));
 
       expect(c.value, 10);
 
@@ -143,9 +145,9 @@ void main() {
     });
 
     test('computed depending on computed', () {
-      final s = Signal(1);
-      final c1 = Computed(() => s.value * 2);
-      final c2 = Computed(() => c1.value + 10);
+      final s = ValueUnit(1);
+      final c1 = CompositeUnit(() => s.value * 2);
+      final c2 = CompositeUnit(() => c1.value + 10);
 
       expect(c2.value, 12); // (1*2)+10
 
@@ -158,10 +160,10 @@ void main() {
     });
 
     test('diamond dependency pattern', () {
-      final source = Signal(1);
-      final left = Computed(() => source.value + 1);
-      final right = Computed(() => source.value + 2);
-      final bottom = Computed(() => left.value + right.value);
+      final source = ValueUnit(1);
+      final left = CompositeUnit(() => source.value + 1);
+      final right = CompositeUnit(() => source.value + 2);
+      final bottom = CompositeUnit(() => left.value + right.value);
 
       expect(bottom.value, 5); // (1+1) + (1+2)
 
@@ -175,12 +177,12 @@ void main() {
     });
 
     test('deep dependency chain of 5 levels', () {
-      final s = Signal(1);
-      final c1 = Computed(() => s.value + 1);
-      final c2 = Computed(() => c1.value + 1);
-      final c3 = Computed(() => c2.value + 1);
-      final c4 = Computed(() => c3.value + 1);
-      final c5 = Computed(() => c4.value + 1);
+      final s = ValueUnit(1);
+      final c1 = CompositeUnit(() => s.value + 1);
+      final c2 = CompositeUnit(() => c1.value + 1);
+      final c3 = CompositeUnit(() => c2.value + 1);
+      final c4 = CompositeUnit(() => c3.value + 1);
+      final c5 = CompositeUnit(() => c4.value + 1);
 
       expect(c5.value, 6);
 
@@ -196,13 +198,13 @@ void main() {
     });
 
     test('deep dependency chain of 10 levels', () {
-      final s = Signal(0);
-      var current = Computed(() => s.value);
-      final computeds = <Computed<int>>[current];
+      final s = ValueUnit(0);
+      var current = CompositeUnit(() => s.value);
+      final computeds = <CompositeUnit<int>>[current];
 
       for (var i = 1; i < 10; i++) {
         final prev = current;
-        current = Computed(() => prev.value + 1);
+        current = CompositeUnit(() => prev.value + 1);
         computeds.add(current);
       }
 
@@ -218,12 +220,12 @@ void main() {
     });
 
     test('dynamic dependency - conditional tracking', () {
-      final condition = Signal(true);
-      final a = Signal(1);
-      final b = Signal(2);
+      final condition = ValueUnit(true);
+      final a = ValueUnit(1);
+      final b = ValueUnit(2);
 
       var computeCount = 0;
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return condition.value ? a.value : b.value;
       });
@@ -253,14 +255,14 @@ void main() {
     });
 
     test('unused dependencies are cleaned up', () {
-      final a = Signal(1);
-      final b = Signal(2);
-      final useA = Signal(true);
+      final a = ValueUnit(1);
+      final b = ValueUnit(2);
+      final useA = ValueUnit(true);
 
       var aAccessCount = 0;
       var bAccessCount = 0;
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         if (useA.value) {
           aAccessCount++;
           return a.value;
@@ -295,11 +297,11 @@ void main() {
   // Lazy Evaluation & Caching
   // ============================================================================
 
-  group('Computed - Lazy Evaluation & Caching', () {
+  group('CompositeView - Lazy Evaluation & Caching', () {
     test('not computed until first access', () {
       var computeCount = 0;
-      final s = Signal(1);
-      final c = Computed(() {
+      final s = ValueUnit(1);
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value * 2;
       });
@@ -318,8 +320,8 @@ void main() {
 
     test('cached until dependency changes', () {
       var computeCount = 0;
-      final s = Signal(1);
-      final c = Computed(() {
+      final s = ValueUnit(1);
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value * 2;
       });
@@ -344,15 +346,15 @@ void main() {
       var compute1Count = 0;
       var compute2Count = 0;
 
-      final s1 = Signal(1);
-      final s2 = Signal(10);
+      final s1 = ValueUnit(1);
+      final s2 = ValueUnit(10);
 
-      final c1 = Computed(() {
+      final c1 = CompositeUnit(() {
         compute1Count++;
         return s1.value * 2;
       });
 
-      final c2 = Computed(() {
+      final c2 = CompositeUnit(() {
         compute2Count++;
         return s2.value * 2;
       });
@@ -376,8 +378,8 @@ void main() {
 
     test('recomputes on access after dependency change', () {
       var computeCount = 0;
-      final s = Signal(1);
-      final c = Computed(() {
+      final s = ValueUnit(1);
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -402,10 +404,10 @@ void main() {
   // Cycle Detection
   // ============================================================================
 
-  group('Computed - Cycle Detection', () {
+  group('CompositeView - Cycle Detection', () {
     test('direct self-reference throws StateError', () {
-      late Computed<int> c;
-      c = Computed(() => c.value + 1);
+      late CompositeUnit<int> c;
+      c = CompositeUnit(() => c.value + 1);
 
       expect(() => c.value, throwsStateError);
 
@@ -413,11 +415,11 @@ void main() {
     });
 
     test('indirect cycle through computed throws StateError', () {
-      late Computed<int> c1;
-      late Computed<int> c2;
+      late CompositeUnit<int> c1;
+      late CompositeUnit<int> c2;
 
-      c1 = Computed(() => c2.value + 1);
-      c2 = Computed(() => c1.value + 1);
+      c1 = CompositeUnit(() => c2.value + 1);
+      c2 = CompositeUnit(() => c1.value + 1);
 
       expect(() => c1.value, throwsStateError);
 
@@ -426,13 +428,13 @@ void main() {
     });
 
     test('three-node cycle throws StateError', () {
-      late Computed<int> c1;
-      late Computed<int> c2;
-      late Computed<int> c3;
+      late CompositeUnit<int> c1;
+      late CompositeUnit<int> c2;
+      late CompositeUnit<int> c3;
 
-      c1 = Computed(() => c3.value + 1);
-      c2 = Computed(() => c1.value + 1);
-      c3 = Computed(() => c2.value + 1);
+      c1 = CompositeUnit(() => c3.value + 1);
+      c2 = CompositeUnit(() => c1.value + 1);
+      c3 = CompositeUnit(() => c2.value + 1);
 
       expect(() => c1.value, throwsStateError);
 
@@ -446,10 +448,10 @@ void main() {
   // Dispose Behavior
   // ============================================================================
 
-  group('Computed - Dispose Behavior', () {
+  group('CompositeView - Dispose Behavior', () {
     test('disposed computed returns cached value', () {
-      final s = Signal(42);
-      final c = Computed(() => s.value * 2);
+      final s = ValueUnit(42);
+      final c = CompositeUnit(() => s.value * 2);
 
       expect(c.value, 84);
 
@@ -462,8 +464,8 @@ void main() {
 
     test('disposed computed stops tracking dependencies', () {
       var computeCount = 0;
-      final s = Signal(1);
-      final c = Computed(() {
+      final s = ValueUnit(1);
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -481,16 +483,16 @@ void main() {
     });
 
     test('double dispose is safe', () {
-      final c = Computed(() => 42);
+      final c = CompositeUnit(() => 42);
       c.dispose();
       c.dispose(); // Should not throw
       expect(c.value, 42);
     });
 
     test('dispose in middle of chain', () {
-      final s = Signal(1);
-      final c1 = Computed(() => s.value * 2);
-      final c2 = Computed(() => c1.value + 10);
+      final s = ValueUnit(1);
+      final c1 = CompositeUnit(() => s.value * 2);
+      final c2 = CompositeUnit(() => c1.value + 10);
 
       expect(c2.value, 12);
 
@@ -506,8 +508,8 @@ void main() {
     });
 
     test('dispose source signal', () {
-      final s = Signal(42);
-      final c = Computed(() => s.value * 2);
+      final s = ValueUnit(42);
+      final c = CompositeUnit(() => s.value * 2);
 
       expect(c.value, 84);
 
@@ -524,10 +526,11 @@ void main() {
   // Complex Scenarios
   // ============================================================================
 
-  group('Computed - Complex Scenarios', () {
+  group('CompositeView - Complex Scenarios', () {
     test('many computeds from one signal', () {
-      final s = Signal(10);
-      final computeds = List.generate(20, (i) => Computed(() => s.value + i));
+      final s = ValueUnit(10);
+      final computeds =
+          List.generate(20, (i) => CompositeUnit(() => s.value + i));
 
       for (var i = 0; i < 20; i++) {
         expect(computeds[i].value, 10 + i);
@@ -546,10 +549,10 @@ void main() {
     });
 
     test('conditional dependency switching', () {
-      final selector = Signal(0);
-      final sources = [Signal(10), Signal(20), Signal(30)];
+      final selector = ValueUnit(0);
+      final sources = [ValueUnit(10), ValueUnit(20), ValueUnit(30)];
 
-      final c = Computed(() => sources[selector.value].value);
+      final c = CompositeUnit(() => sources[selector.value].value);
 
       expect(c.value, 10);
 
@@ -570,10 +573,10 @@ void main() {
     });
 
     test('dependencies that return same value do not trigger recompute', () {
-      final s = Signal(10);
+      final s = ValueUnit(10);
       var computeCount = 0;
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         computeCount++;
         return s.value;
       });
@@ -590,10 +593,10 @@ void main() {
     });
 
     test('computed with side effects (counting)', () {
-      final s = Signal(0);
+      final s = ValueUnit(0);
       var sideEffectCount = 0;
 
-      final c = Computed(() {
+      final c = CompositeUnit(() {
         sideEffectCount++;
         return s.value * 2;
       });
@@ -614,16 +617,18 @@ void main() {
     });
 
     test('wide dependency tree', () {
-      final signals = List.generate(10, Signal.new);
+      final signals = List.generate(10, ValueUnit.new);
       final layer1 = List.generate(
         5,
-        (i) => Computed(() => signals[i * 2].value + signals[i * 2 + 1].value),
+        (i) => CompositeUnit(
+            () => signals[i * 2].value + signals[i * 2 + 1].value),
       );
       final layer2 = [
-        Computed(() => layer1[0].value + layer1[1].value),
-        Computed(() => layer1[2].value + layer1[3].value + layer1[4].value),
+        CompositeUnit(() => layer1[0].value + layer1[1].value),
+        CompositeUnit(
+            () => layer1[2].value + layer1[3].value + layer1[4].value),
       ];
-      final root = Computed(() => layer2[0].value + layer2[1].value);
+      final root = CompositeUnit(() => layer2[0].value + layer2[1].value);
 
       // 0+1+2+3+4+5+6+7+8+9 = 45
       expect(root.value, 45);
@@ -644,12 +649,12 @@ void main() {
     });
 
     test('computed returns different types', () {
-      final s = Signal(5);
+      final s = ValueUnit(5);
 
-      final intC = Computed<int>(() => s.value);
-      final doubleC = Computed<double>(() => s.value.toDouble());
-      final stringC = Computed<String>(() => s.value.toString());
-      final boolC = Computed<bool>(() => s.value > 3);
+      final intC = CompositeUnit<int>(() => s.value);
+      final doubleC = CompositeUnit<double>(() => s.value.toDouble());
+      final stringC = CompositeUnit<String>(() => s.value.toString());
+      final boolC = CompositeUnit<bool>(() => s.value > 3);
 
       expect(intC.value, 5);
       expect(doubleC.value, 5.0);
@@ -671,8 +676,8 @@ void main() {
     });
 
     test('computed with nullable return', () {
-      final s = Signal<int?>(null);
-      final c = Computed<int?>(() => s.value);
+      final s = ValueUnit<int?>(null);
+      final c = CompositeUnit<int?>(() => s.value);
 
       expect(c.value, isNull);
 
@@ -687,8 +692,8 @@ void main() {
     });
 
     test('computed accessing multiple properties of same signal', () {
-      final s = Signal<(int, String)>((1, 'hello'));
-      final c = Computed(() => '${s.value.$1}: ${s.value.$2}');
+      final s = ValueUnit<(int, String)>((1, 'hello'));
+      final c = CompositeUnit(() => '${s.value.$1}: ${s.value.$2}');
 
       expect(c.value, '1: hello');
 
@@ -700,9 +705,9 @@ void main() {
     });
 
     test('computed with list manipulation', () {
-      final s = Signal<List<int>>([1, 2, 3]);
-      final sum = Computed(() => s.value.fold<int>(0, (a, b) => a + b));
-      final length = Computed(() => s.value.length);
+      final s = ValueUnit<List<int>>([1, 2, 3]);
+      final sum = CompositeUnit(() => s.value.fold<int>(0, (a, b) => a + b));
+      final length = CompositeUnit(() => s.value.length);
 
       expect(sum.value, 6);
       expect(length.value, 3);
@@ -717,10 +722,10 @@ void main() {
     });
 
     test('computed with map operations', () {
-      final s = Signal<Map<String, int>>({'a': 1, 'b': 2});
-      final keys = Computed(() => s.value.keys.toList()..sort());
+      final s = ValueUnit<Map<String, int>>({'a': 1, 'b': 2});
+      final keys = CompositeUnit(() => s.value.keys.toList()..sort());
       final values =
-          Computed(() => s.value.values.fold<int>(0, (a, b) => a + b));
+          CompositeUnit(() => s.value.values.fold<int>(0, (a, b) => a + b));
 
       expect(keys.value, ['a', 'b']);
       expect(values.value, 3);
@@ -739,9 +744,9 @@ void main() {
   // Edge Cases
   // ============================================================================
 
-  group('Computed - Edge Cases', () {
+  group('CompositeView - Edge Cases', () {
     test('computed that throws on first access', () {
-      final c = Computed<int>(() => throw Exception('test error'));
+      final c = CompositeUnit<int>(() => throw Exception('test error'));
 
       expect(() => c.value, throwsException);
 
@@ -749,8 +754,8 @@ void main() {
     });
 
     test('computed that throws conditionally', () {
-      final s = Signal(false);
-      final c = Computed<int>(() {
+      final s = ValueUnit(false);
+      final c = CompositeUnit<int>(() {
         if (s.value) throw Exception('error');
         return 42;
       });
@@ -768,8 +773,8 @@ void main() {
     });
 
     test('computed with very long computation', () {
-      final s = Signal(1000000);
-      final c = Computed(() {
+      final s = ValueUnit(1000000);
+      final c = CompositeUnit(() {
         var sum = 0;
         for (var i = 0; i < s.value; i++) {
           sum += i;
@@ -785,9 +790,9 @@ void main() {
 
     test('accessing computed during its own recomputation through dependency',
         () {
-      final s = Signal(1);
-      late Computed<int> c;
-      c = Computed(() {
+      final s = ValueUnit(1);
+      late CompositeUnit<int> c;
+      c = CompositeUnit(() {
         if (s.value > 5) {
           // This would cause a cycle if we accessed c.value here
           // But we're just accessing s.value
@@ -806,8 +811,8 @@ void main() {
 
     test('computed with closure capturing external state', () {
       var external = 10;
-      final s = Signal(5);
-      final c = Computed(() => s.value + external);
+      final s = ValueUnit(5);
+      final c = CompositeUnit(() => s.value + external);
 
       expect(c.value, 15);
 
@@ -823,10 +828,10 @@ void main() {
     });
 
     test('rapidly creating and disposing computeds', () {
-      final s = Signal(1);
+      final s = ValueUnit(1);
 
       for (var i = 0; i < 100; i++) {
-        final c = Computed(() => s.value * i);
+        final c = CompositeUnit(() => s.value * i);
         expect(c.value, i);
         c.dispose();
       }
@@ -835,10 +840,10 @@ void main() {
     });
 
     test('computed with boolean logic', () {
-      final a = Signal(true);
-      final b = Signal(false);
-      final andResult = Computed(() => a.value && b.value);
-      final orResult = Computed(() => a.value || b.value);
+      final a = ValueUnit(true);
+      final b = ValueUnit(false);
+      final andResult = CompositeUnit(() => a.value && b.value);
+      final orResult = CompositeUnit(() => a.value || b.value);
 
       expect(andResult.value, false);
       expect(orResult.value, true);
@@ -854,9 +859,10 @@ void main() {
     });
 
     test('computed with string concatenation', () {
-      final firstName = Signal('John');
-      final lastName = Signal('Doe');
-      final fullName = Computed(() => '${firstName.value} ${lastName.value}');
+      final firstName = ValueUnit('John');
+      final lastName = ValueUnit('Doe');
+      final fullName =
+          CompositeUnit(() => '${firstName.value} ${lastName.value}');
 
       expect(fullName.value, 'John Doe');
 
@@ -872,8 +878,8 @@ void main() {
     });
     test('computed stream', () async {
       const target = 42;
-      final source = Signal(0);
-      final c = Computed(() => source.value);
+      final source = ValueUnit(0);
+      final c = CompositeUnit(() => source.value);
       final values = <int>[];
       final sub = c.listen(values.add);
       expect(values, isEmpty);
@@ -882,8 +888,8 @@ void main() {
       await sub.cancel();
     });
     test('computed filtering list', () {
-      final numbers = Signal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-      final evens = Computed(
+      final numbers = ValueUnit([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      final evens = CompositeUnit(
         () => numbers.value.where((n) => n.isEven).toList(),
       );
 
@@ -897,8 +903,8 @@ void main() {
     });
 
     test('computed with date operations', () {
-      final date = Signal(DateTime(2023, 1, 15));
-      final isWeekend = Computed(
+      final date = ValueUnit(DateTime(2023, 1, 15));
+      final isWeekend = CompositeUnit(
         () =>
             date.value.weekday == DateTime.saturday ||
             date.value.weekday == DateTime.sunday,
@@ -914,16 +920,16 @@ void main() {
     });
 
     test('computed chain performance', () {
-      final source = Signal(0);
-      final computeds = <Computed<int>>[];
+      final source = ValueUnit(0);
+      final computeds = <CompositeUnit<int>>[];
 
       // Create a chain of 50 computeds
-      var current = Computed(() => source.value);
+      var current = CompositeUnit(() => source.value);
       computeds.add(current);
 
       for (var i = 1; i < 50; i++) {
         final prev = current;
-        current = Computed(() => prev.value + 1);
+        current = CompositeUnit(() => prev.value + 1);
         computeds.add(current);
       }
 
@@ -939,9 +945,9 @@ void main() {
     });
 
     test('computed with enum values', () {
-      final status = Signal(_Status.pending);
-      final isComplete = Computed(() => status.value == _Status.completed);
-      final statusText = Computed(() {
+      final status = ValueUnit(_Status.pending);
+      final isComplete = CompositeUnit(() => status.value == _Status.completed);
+      final statusText = CompositeUnit(() {
         switch (status.value) {
           case _Status.pending:
             return 'Pending';
