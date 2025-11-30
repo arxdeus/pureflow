@@ -1,6 +1,6 @@
 # PureFlow
 
-A high-performance reactive signals library for Dart and Flutter.
+A high-performance reactive state management library for Dart and Flutter
 
 PureFlow provides a minimal, fast, and type-safe reactive state management solution. It combines the simplicity of signals with the power of computed values and controlled async pipelines.
 
@@ -8,14 +8,14 @@ PureFlow provides a minimal, fast, and type-safe reactive state management solut
 
 ## Features
 
-- **🚀 Blazing Fast** — Faster than `signals_core` in all benchmarks
+- **🚀 Blazing Fast** — Faster than most of the packages in all benchmarks
 - **🎯 Type-Safe** — Full type inference with no runtime surprises
 - **🔗 Automatic Dependency Tracking** — Computed values track dependencies automatically
 - **📦 Lazy Evaluation** — Computations only run when accessed
 - **🔄 Batching** — Group multiple updates into a single notification
 - **⚡ Zero-Allocation Listeners** — Linked list-based listener management
 - **🌊 Stream Integration** — Every reactive value is also a `Stream`
-- **🎛️ Controlled Async** — Pipeline system for structured async operations
+- **🎛️ Controlled Async** — Pipeline system for handling concurrency of async operations
 
 ---
 
@@ -28,7 +28,7 @@ dependencies:
   pureflow: ^1.0.0
 ```
 
-For Flutter projects, also add:
+For Flutter projects use instead:
 
 ```yaml
 dependencies:
@@ -39,7 +39,7 @@ dependencies:
 
 ## Core Concepts
 
-### Store (Signal)
+### Store
 
 `Store` is a reactive container for a single mutable value. When the value changes, all listeners and dependent computeds are automatically notified.
 
