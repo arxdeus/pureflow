@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:pureflow/src/value_unit/value_unit.dart' as pureflow;
+import 'package:pureflow/pureflow.dart' as pureflow;
 
 /// Zero-allocation view adapter - просто делегирует вызовы.
 /// Используйте когда нужен только ValueListenable без возможности

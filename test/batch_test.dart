@@ -1,4 +1,4 @@
-import 'package:pureflow/src/value_unit/value_unit.dart';
+import 'package:pureflow/pureflow.dart';
 import 'package:test/test.dart';
 
 void main() {

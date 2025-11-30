@@ -114,8 +114,8 @@ Future<double> _runPipelineBenchmark({
 
   for (var i = 0; i < iterations; i++) {
     final pipeline = Pipeline(
-      transformer: transformer ??
-          (events, mapper) => events.asyncExpand(mapper),
+      transformer:
+          transformer ?? (events, mapper) => events.asyncExpand(mapper),
     );
 
     final futures = <Future<int>>[];
@@ -163,4 +163,3 @@ Stream<R> _switchMapTransformer<E, R>(
     ),
   );
 }
-

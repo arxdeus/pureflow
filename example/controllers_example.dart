@@ -8,8 +8,7 @@ library;
 import 'dart:async';
 import 'dart:math';
 
-import 'package:pureflow/src/pipeline/pipeline.dart';
-import 'package:pureflow/src/value_unit/value_unit.dart';
+import 'package:pureflow/pureflow.dart';
 
 // ============================================================================
 // Common Types
@@ -43,8 +42,8 @@ class GeoLocation {
   const GeoLocation({
     required this.latitude,
     required this.longitude,
-    this.accuracy,
     required this.timestamp,
+    this.accuracy,
   });
 
   @override

@@ -1,5 +1,5 @@
 import 'package:benchmark_harness/benchmark_harness.dart';
-import 'package:pureflow/src/value_unit/value_unit.dart';
+import 'package:pureflow/pureflow.dart';
 
 /// Benchmark suite for PureFlow reactive primitives using benchmark_harness.
 void main() {
