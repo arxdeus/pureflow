@@ -4,14 +4,15 @@ import 'package:pureflow/src/value_unit/value_unit.dart' as pureflow;
 /// Zero-allocation view adapter - просто делегирует вызовы.
 /// Используйте когда нужен только ValueListenable без возможности
 /// изменять значение через адаптер.
-class ValueUnitView<T> implements ValueListenable<T> {
-  const ValueUnitView._(this._source);
+class ValueUnitListenable<T> implements ValueListenable<T> {
+  const ValueUnitListenable._(this._source);
 
   @pragma('vm:prefer-inline')
-  factory ValueUnitView(pureflow.ValueUnit<T> source) =>
-      (_listenables[source] ??= ValueUnitView<T>._(source)) as ValueUnitView<T>;
+  factory ValueUnitListenable(pureflow.ValueUnit<T> source) =>
+      (_listenables[source] ??= ValueUnitListenable<T>._(source))
+          as ValueUnitListenable<T>;
 
-  static final _listenables = Expando<ValueUnitView<Object?>>();
+  static final _listenables = Expando<ValueUnitListenable<Object?>>();
 
   final pureflow.ValueUnit<T> _source;
 
@@ -37,7 +38,7 @@ extension ValueUnitFlutterX<T> on pureflow.ValueUnit<T> {
   /// Создаёт легковесный read-only view как ValueListenable.
   /// Zero overhead - просто делегирует вызовы.
   @pragma('vm:prefer-inline')
-  ValueListenable<T> get asListenable => ValueUnitView<T>(this);
+  ValueListenable<T> get asListenable => ValueUnitListenable<T>(this);
 }
 
 extension CompositeViewFlutterX<T> on pureflow.CompositeUnit<T> {
