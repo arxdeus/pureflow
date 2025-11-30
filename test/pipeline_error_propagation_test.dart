@@ -100,12 +100,12 @@ void main() {
       var successResult = 0;
 
       await Future.wait([
-        pipeline.run((context) async {
+        pipeline.run((context) {
           throw Exception('error 1');
         }).then((_) {}, onError: (Object _) {
           errorCount++;
         }),
-        pipeline.run((context) async {
+        pipeline.run((context) {
           throw Exception('error 2');
         }).then((_) {}, onError: (Object _) {
           errorCount++;

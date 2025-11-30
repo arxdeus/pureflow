@@ -211,8 +211,6 @@ mixin class ChangeNotifier implements Listenable {
   /// will not be visited. Listeners that are removed during this iteration will
   /// not be visited after they are removed.
   ///
-  /// Exceptions thrown by listeners will be caught and reported using
-  /// [FlutterError.reportError].
   ///
   /// This method must not be called after [dispose] has been called.
   ///

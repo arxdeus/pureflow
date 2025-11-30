@@ -140,24 +140,6 @@ void main() {
       expect(wasActiveAfterDelay, false);
     });
 
-    test('eventDuration increases during execution', () async {
-      final pipeline = Pipeline(transformer: _sequentialTransformer);
-      Duration? duration1;
-      Duration? duration2;
-
-      await pipeline.run((context) async {
-        duration1 = context.eventDuration;
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        duration2 = context.eventDuration;
-        return null;
-      });
-
-      expect(duration1, isNotNull);
-      expect(duration2, isNotNull);
-      expect(duration2!.inMilliseconds, greaterThan(duration1!.inMilliseconds));
-      await pipeline.dispose();
-    });
-
     test('context is unique per task', () async {
       final pipeline = Pipeline(transformer: _concurrentTransformer);
       final contexts = <PipelineEventContext>[];

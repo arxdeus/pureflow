@@ -23,8 +23,6 @@ final class PipelineEventContext {
   final Completer<dynamic> _completer;
   final _TaskStream _taskStream;
 
-  // Lazy stopwatch - only created when eventDuration is accessed
-  Stopwatch? _stopwatch;
   bool _isCancelled = false;
 
   PipelineEventContext._({
@@ -38,17 +36,6 @@ final class PipelineEventContext {
   /// Returns whether the event is still active (not cancelled and pipeline active).
   @pragma('vm:prefer-inline')
   bool get isActive => !_isCancelled && _taskStream._isActive;
-
-  /// Returns the duration for which the current event has been processing.
-  /// Note: Accessing this property starts the stopwatch on first access.
-  @pragma('vm:prefer-inline')
-  Duration get eventDuration => (_stopwatch ??= Stopwatch()..start()).elapsed;
-
-  @pragma('vm:prefer-inline')
-  void _startTiming() => _stopwatch?.start();
-
-  @pragma('vm:prefer-inline')
-  void _stopTiming() => _stopwatch?.stop();
 
   @pragma('vm:prefer-inline')
   void _cancel() => _isCancelled = true;
@@ -444,7 +431,6 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
 
   Future<void> _run() async {
     final evt = event; // Cache for hot path
-    evt._startTiming();
     try {
       // Future.sync wraps synchronous exceptions into Future errors
       final result = await Future.sync(() => evt._task(evt));
@@ -474,7 +460,6 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
         _invokeDoneHandlerIfNeeded();
       }
     } finally {
-      evt._stopTiming();
       // Close stream in finally to ensure it's always called
       _closeStream();
     }
