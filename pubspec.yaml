@@ -8,8 +8,8 @@ environment:
   flutter: ">=3.24.0"
 
 dev_dependencies:
-  test: ^1.28.0
-  benchmark_harness: ^2.4.0
+  test: any
+  benchmark_harness: any
   signals_core: ^6.2.0
 
   pureflow: any
