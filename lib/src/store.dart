@@ -1,5 +1,5 @@
-import 'package:pureflow/src/impl/state/store_impl.dart';
-import 'package:pureflow/src/interface/state/interfaces.dart';
+import 'package:pureflow/src/implementation/state/store_impl.dart';
+import 'package:pureflow/src/interfaces.dart';
 
 // ============================================================================
 // Store (Signal) - Public Interface

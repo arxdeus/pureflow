@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:meta/meta.dart';
-
-import 'package:pureflow/src/impl/pipeline/pipeline_event_context.dart';
-import 'package:pureflow/src/interface/pipeline/interfaces.dart';
+import 'package:pureflow/src/implementation/pipeline/pipeline_event_context.dart';
 import 'package:pureflow/src/internal/pipeline/single_event_stream.dart';
 import 'package:pureflow/src/internal/pipeline/source_stream.dart';
+import 'package:pureflow/src/pipeline.dart';
 
 /// Internal stream wrapper for processing pipeline tasks.
 @internal

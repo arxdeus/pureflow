@@ -1,5 +1,5 @@
 import 'package:pureflow/src/internal/state/reactive_source.dart';
-import 'package:pureflow/src/interface/state/store.dart';
+import 'package:pureflow/src/store.dart';
 
 // ============================================================================
 // StoreImpl (Signal) - Optimized Implementation

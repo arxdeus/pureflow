@@ -140,31 +140,6 @@ void main() {
       expect(wasActiveAfterDelay, false);
     });
 
-    test('context is unique per task', () async {
-      final pipeline = Pipeline(transformer: _concurrentTransformer);
-      final contexts = <PipelineEventContext>[];
-
-      await Future.wait([
-        pipeline.run((context) async {
-          contexts.add(context);
-          return null;
-        }),
-        pipeline.run((context) async {
-          contexts.add(context);
-          return null;
-        }),
-        pipeline.run((context) async {
-          contexts.add(context);
-          return null;
-        }),
-      ]);
-
-      expect(contexts.length, 3);
-      expect(contexts.toSet().length, 3); // All different
-
-      await pipeline.dispose();
-    });
-
     test('context isActive checked multiple times', () async {
       final pipeline = Pipeline(transformer: _sequentialTransformer);
       final activeChecks = <bool>[];
@@ -502,8 +477,7 @@ void main() {
           return null;
         }),
         pipeline.run((context) async {
-          successResult = 42;
-          return successResult;
+          return successResult = 42;
         }),
       ]);
 

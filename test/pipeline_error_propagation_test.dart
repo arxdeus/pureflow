@@ -100,12 +100,12 @@ void main() {
       var successResult = 0;
 
       await Future.wait([
-        pipeline.run((context) {
+        pipeline.run<void>((context) {
           throw Exception('error 1');
         }).then((_) {}, onError: (Object _) {
           errorCount++;
         }),
-        pipeline.run((context) {
+        pipeline.run<void>((context) {
           throw Exception('error 2');
         }).then((_) {}, onError: (Object _) {
           errorCount++;
@@ -128,7 +128,7 @@ void main() {
       Object? caughtError;
 
       try {
-        await pipeline.run((context) async {
+        await pipeline.run<void>((context) {
           throw StateError('test state error');
         });
       } catch (e, st) {
@@ -160,7 +160,7 @@ void main() {
       Object? caughtError;
 
       try {
-        await pipeline.run((context) async {
+        await pipeline.run<void>((context) {
           throw ArgumentError('invalid argument');
         });
       } catch (e) {
@@ -177,7 +177,7 @@ void main() {
 
       for (var i = 0; i < 3; i++) {
         try {
-          await pipeline.run((context) async {
+          await pipeline.run<void>((context) {
             throw Exception('error $i');
           });
         } catch (_) {
@@ -194,17 +194,17 @@ void main() {
       var errorCount = 0;
 
       await Future.wait([
-        pipeline.run((context) async {
+        pipeline.run<void>((context) {
           throw Exception('error 1');
         }).then((_) {}, onError: (Object _) {
           errorCount++;
         }),
-        pipeline.run((context) async {
+        pipeline.run<void>((context) {
           throw Exception('error 2');
         }).then((_) {}, onError: (Object _) {
           errorCount++;
         }),
-        pipeline.run((context) async {
+        pipeline.run<void>((context) {
           throw Exception('error 3');
         }).then((_) {}, onError: (Object _) {
           errorCount++;
@@ -220,7 +220,7 @@ void main() {
       String? errorMessage;
 
       try {
-        await pipeline.run((context) async {
+        await pipeline.run<void>((context) {
           throw Exception('specific error message');
         });
       } catch (e) {

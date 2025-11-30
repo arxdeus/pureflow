@@ -1,5 +1,5 @@
 import 'package:meta/meta.dart';
-import 'package:pureflow/src/interface/state/interfaces.dart';
+import 'package:pureflow/src/interfaces.dart';
 
 // ============================================================================
 // Listener Node (Simple, for callback listeners only)

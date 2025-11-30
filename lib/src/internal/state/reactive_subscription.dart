@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
+import 'package:pureflow/src/interfaces.dart';
 import 'package:pureflow/src/internal/state/globals.dart';
-import 'package:pureflow/src/interface/state/interfaces.dart';
 
 /// Interface for reactive sources used by ReactiveSubscription.
 @internal
