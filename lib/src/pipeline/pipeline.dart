@@ -117,25 +117,13 @@ class _TaskStream {
   }
 
   void _initializeProcessing() {
-    final sourceStream = _createSourceStream();
+    final sourceStream = _SourceStream._(this);
     final processedStream = transformer(sourceStream, _processEvent);
     _subscription = processedStream.listen(
       null, // Results are handled in _SinglePipelineEventSubscription
       cancelOnError: false,
       onDone: _handleDone,
     );
-  }
-
-  Stream<dynamic> _createSourceStream() async* {
-    while (_isActive) {
-      if (_eventQueue.isEmpty) {
-        final pendingCompleter = _waitingCompleter ??= Completer<void>();
-        await pendingCompleter.future;
-        _waitingCompleter = null;
-        if (!_isActive) return;
-      }
-      yield _eventQueue.removeFirst();
-    }
   }
 
   @pragma('vm:prefer-inline')
@@ -257,6 +245,158 @@ class _TaskStream {
   }
 }
 
+/// Custom Stream implementation to replace async* generator.
+/// Pulls events from _TaskStream's queue on demand.
+class _SourceStream extends Stream<dynamic> {
+  final _TaskStream _taskStream;
+
+  _SourceStream._(this._taskStream);
+
+  @override
+  StreamSubscription<dynamic> listen(
+    void Function(dynamic event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _SourceStreamSubscription._(
+      _taskStream,
+      onData,
+      onDone,
+    );
+  }
+}
+
+/// Bit flags for source stream subscription status.
+const int _srcCanceledBit = 1 << 0;
+const int _srcPausedBit = 1 << 1;
+const int _srcScheduledBit = 1 << 2;
+
+/// Custom StreamSubscription for _SourceStream.
+class _SourceStreamSubscription implements StreamSubscription<dynamic> {
+  final _TaskStream _taskStream;
+  void Function(dynamic event)? _onData;
+  void Function()? _onDone;
+
+  int _statusFlag = 0;
+  Completer<void>? _resumeCompleter;
+
+  _SourceStreamSubscription._(
+    this._taskStream,
+    this._onData,
+    this._onDone,
+  ) {
+    _scheduleNext();
+  }
+
+  void _scheduleNext() {
+    // Prevent multiple scheduleMicrotask calls
+    if (_statusFlag.hasFlag(_srcScheduledBit)) return;
+    if (_statusFlag.hasFlag(_srcCanceledBit)) return;
+
+    _statusFlag = _statusFlag.setFlag(_srcScheduledBit);
+    _processNext();
+  }
+
+  void _processNext() {
+    _statusFlag = _statusFlag.clearFlag(_srcScheduledBit);
+
+    if (_statusFlag.hasFlag(_srcCanceledBit)) return;
+
+    // If paused, wait for resume
+    if (_statusFlag.hasFlag(_srcPausedBit)) return;
+
+    // If stream is closed
+    if (!_taskStream._isActive) {
+      _invokeDone();
+      return;
+    }
+
+    // If queue is empty, wait for new events
+    if (_taskStream._eventQueue.isEmpty) {
+      final completer =
+          _taskStream._waitingCompleter ??= Completer<void>.sync();
+      completer.future.then((_) {
+        if (!_statusFlag.hasFlag(_srcCanceledBit)) {
+          _scheduleNext();
+        }
+      });
+      return;
+    }
+
+    // Get event from queue and emit
+    final event = _taskStream._eventQueue.removeFirst();
+
+    _onData?.call(event);
+    // Schedule next event processing
+    _scheduleNext();
+  }
+
+  @pragma('vm:prefer-inline')
+  void _invokeDone() => _onDone?.call();
+
+  @override
+  Future<void> cancel() {
+    if (_statusFlag.hasFlag(_srcCanceledBit)) {
+      return const SynchronousFuture<void>(null);
+    }
+    _statusFlag = _statusFlag.setFlag(_srcCanceledBit);
+    _completeResumeCompleter();
+    return const SynchronousFuture<void>(null);
+  }
+
+  @override
+  void pause([Future<void>? resumeSignal]) {
+    if (_statusFlag.hasFlag(_srcPausedBit | _srcCanceledBit)) return;
+    _statusFlag = _statusFlag.setFlag(_srcPausedBit);
+    resumeSignal?.whenComplete(resume);
+  }
+
+  @override
+  void resume() {
+    if (!_statusFlag.hasFlag(_srcPausedBit)) return;
+    _statusFlag = _statusFlag.clearFlag(_srcPausedBit);
+    _completeResumeCompleter();
+    _scheduleNext();
+  }
+
+  @pragma('vm:prefer-inline')
+  void _completeResumeCompleter() {
+    final completer = _resumeCompleter;
+    if (completer != null) {
+      _resumeCompleter = null;
+      completer.complete();
+    }
+  }
+
+  @override
+  bool get isPaused => _statusFlag.hasFlag(_srcPausedBit);
+
+  @override
+  void onData(void Function(dynamic event)? handleData) {
+    _onData = handleData;
+  }
+
+  @override
+  void onError(Function? handleError) {}
+
+  @override
+  void onDone(void Function()? handleDone) {
+    _onDone = handleDone;
+  }
+
+  @override
+  Future<E> asFuture<E>([E? futureValue]) {
+    final completer = Completer<E>();
+    final oldOnDone = _onDone;
+    _onDone = () {
+      oldOnDone?.call();
+      completer.complete(futureValue);
+    };
+    return completer.future;
+  }
+}
+
 /// Bit flags for pipeline event status.
 const int _canceledBit = 1 << 0;
 const int _pausedBit = 1 << 1;
@@ -293,7 +433,6 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   final void Function(_PipelineEvent<dynamic> event) onStreamClosed;
   void Function(dynamic event)? _onData;
   void Function()? _onDone;
-  final Zone _zone = Zone.current;
 
   int _statusFlag = 0;
   Completer<void>? _resumeCompleter;
@@ -315,7 +454,8 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   Future<void> _run() async {
     event._stopwatch.start();
     try {
-      final result = await event.task(event.context);
+      final future = Future.sync(() => event.task(event.context));
+      final result = await future;
       if (_shouldEmit) {
         await _completeWithResult(result);
       } else {
@@ -370,12 +510,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   }
 
   @pragma('vm:prefer-inline')
-  void _invokeDataHandler(dynamic result) {
-    final handler = _onData;
-    if (handler != null) {
-      _zone.runUnaryGuarded(handler, result);
-    }
-  }
+  void _invokeDataHandler(dynamic result) => _onData?.call(result);
 
   @pragma('vm:prefer-inline')
   void _invokeDoneHandlerIfNeeded() {
@@ -383,10 +518,7 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     // Don't call onDone if subscription is canceled - it may cause assertion errors
     if (_statusFlag.hasFlag(_canceledBit)) return;
     _statusFlag = _statusFlag.setFlag(_didCallDoneBit);
-    final doneHandler = _onDone;
-    if (doneHandler != null) {
-      _zone.runGuarded(doneHandler);
-    }
+    _onDone?.call();
   }
 
   Future<void> _completeWithResult(dynamic result) async {
