@@ -79,14 +79,12 @@ void main() {
 
       await expectLater(
         pipeline.run<Never>((context) {
-          print('test 1');
           throw Exception('error');
         }),
         throwsException,
       );
 
       final result = await pipeline.run((context) {
-        print('test 2');
         return Future.value(42);
       });
 
