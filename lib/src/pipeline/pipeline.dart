@@ -14,54 +14,44 @@ typedef EventTransformer<EventType, ResultType> = Stream<ResultType> Function(
   EventMapper<EventType, ResultType> process,
 );
 
-/// Mixin for objects that can be cancelled and track active state.
-mixin _CancellableMixin {
-  _TaskStream get _taskStream;
+/// Context object that provides access to the active status of a pipeline event.
+/// Can be used directly as a parameter in pipeline tasks.
+///
+/// This class is also the internal event wrapper - unified for zero-allocation overhead.
+final class PipelineEventContext {
+  final Future<dynamic> Function(PipelineEventContext context) _task;
+  final Completer<dynamic> _completer;
+  final _TaskStream _taskStream;
+
+  // Lazy stopwatch - only created when eventDuration is accessed
+  Stopwatch? _stopwatch;
   bool _isCancelled = false;
 
+  PipelineEventContext._({
+    required Future<dynamic> Function(PipelineEventContext) task,
+    required Completer<dynamic> completer,
+    required _TaskStream taskStream,
+  })  : _task = task,
+        _completer = completer,
+        _taskStream = taskStream;
+
+  /// Returns whether the event is still active (not cancelled and pipeline active).
   @pragma('vm:prefer-inline')
   bool get isActive => !_isCancelled && _taskStream._isActive;
 
-  @pragma('vm:prefer-inline')
-  void markCancelled() => _isCancelled = true;
-}
-
-/// Context object that provides access to the active status of a pipeline event.
-/// Can be used directly as a parameter in pipeline tasks.
-class PipelineEventContext with _CancellableMixin {
-  @override
-  final _TaskStream _taskStream;
-  final Stopwatch _stopwatch;
-
-  PipelineEventContext._(this._taskStream, this._stopwatch);
-
   /// Returns the duration for which the current event has been processing.
+  /// Note: Accessing this property starts the stopwatch on first access.
   @pragma('vm:prefer-inline')
-  Duration get eventDuration => _stopwatch.elapsed;
-}
-
-/// Internal event wrapper for pipeline tasks.
-class _PipelineEvent<ResultType> with _CancellableMixin {
-  final Future<ResultType> Function(PipelineEventContext context) task;
-  final Completer<ResultType> completer;
-  @override
-  final _TaskStream _taskStream;
-  late final PipelineEventContext context;
-  final Stopwatch _stopwatch = Stopwatch();
-
-  _PipelineEvent({
-    required this.task,
-    required this.completer,
-    required _TaskStream taskStream,
-  }) : _taskStream = taskStream {
-    context = PipelineEventContext._(_taskStream, _stopwatch);
-  }
+  Duration get eventDuration => (_stopwatch ??= Stopwatch()..start()).elapsed;
 
   @pragma('vm:prefer-inline')
-  void cancel() {
-    markCancelled();
-    context.markCancelled();
-  }
+  void _startTiming() => _stopwatch?.start();
+
+  @pragma('vm:prefer-inline')
+  void _stopTiming() => _stopwatch?.stop();
+
+  @pragma('vm:prefer-inline')
+  void _cancel() => _isCancelled = true;
 }
 
 /// Pipeline processes tasks through a unified event bus with transformation.
@@ -81,7 +71,7 @@ class Pipeline {
   ) {
     final completer = Completer<ResultType>.sync();
     _taskStream.add(
-      _PipelineEvent<ResultType>(
+      PipelineEventContext._(
         task: task,
         completer: completer,
         taskStream: _taskStream,
@@ -95,6 +85,7 @@ class Pipeline {
   /// If [force] is `true`, all events become inactive immediately.
   /// If [force] is `false`, new events are prevented and the method waits
   /// for all active events to complete.
+  @pragma('vm:prefer-inline')
   Future<void> dispose({bool force = false}) =>
       _taskStream.dispose(force: force);
 }
@@ -103,19 +94,20 @@ class Pipeline {
 class _TaskStream {
   final EventTransformer<dynamic, dynamic> transformer;
   // Use ListQueue for better performance - more cache-friendly than Queue
-  final Queue<_PipelineEvent<dynamic>> _eventQueue =
-      Queue<_PipelineEvent<dynamic>>();
+  final Queue<PipelineEventContext> _eventQueue = Queue<PipelineEventContext>();
   // Use Set for O(1) removal instead of List O(n)
-  final Set<_PipelineEvent<dynamic>> _activeEvents = {};
+  final Set<PipelineEventContext> _activeEvents = {};
   Completer<void>? _waitingCompleter;
   bool _isActive = true;
   bool _isDisposed = false;
+  // ignore: cancel_subscriptions - cancelled in dispose()
   StreamSubscription<dynamic>? _subscription;
 
   _TaskStream({required this.transformer}) {
     _initializeProcessing();
   }
 
+  @pragma('vm:prefer-inline')
   void _initializeProcessing() {
     final sourceStream = _SourceStream._(this);
     final processedStream = transformer(sourceStream, _processEvent);
@@ -144,18 +136,19 @@ class _TaskStream {
 
   @pragma('vm:prefer-inline')
   void _cancelActiveEvents() {
-    if (_activeEvents.isEmpty) return;
+    final activeEvents = _activeEvents;
+    if (activeEvents.isEmpty) return;
     // Iterate directly over Set without copying
-    for (final event in _activeEvents) {
-      event.cancel();
+    for (final event in activeEvents) {
+      event._cancel();
     }
-    _activeEvents.clear();
+    activeEvents.clear();
   }
 
   @pragma('vm:prefer-inline')
   Stream<dynamic> _processEvent(dynamic event) {
     // Fast type check
-    if (event is! _PipelineEvent<dynamic>) {
+    if (event is! PipelineEventContext) {
       return const Stream<dynamic>.empty();
     }
     _activeEvents.add(event);
@@ -163,10 +156,10 @@ class _TaskStream {
   }
 
   @pragma('vm:prefer-inline')
-  void add(_PipelineEvent<dynamic> event) {
+  void add(PipelineEventContext event) {
     // Optimize: check _isDisposed first (most common case)
-    if (_isDisposed) return event.cancel();
-    if (!_isActive) return event.cancel();
+    if (_isDisposed) return event._cancel();
+    if (!_isActive) return event._cancel();
 
     _eventQueue.add(event);
     _completeWaitingCompleter();
@@ -181,51 +174,47 @@ class _TaskStream {
     if (_isDisposed) return;
     _isDisposed = true;
 
+    final eventQueue = _eventQueue;
+    final activeEvents = _activeEvents;
+
     if (force) {
       // Force mode: make all events inactive immediately
       _isActive = false;
 
       // Cancel all queued events (they haven't started yet)
-      final queueLength = _eventQueue.length;
+      final queueLength = eventQueue.length;
       for (var index = 0; index < queueLength; index++) {
-        _eventQueue.removeFirst().cancel();
+        eventQueue.removeFirst()._cancel();
       }
 
       _cancelActiveEvents();
       _completeWaitingCompleter();
 
       // Cancel the subscription
-      await _subscription?.cancel();
+      final sub = _subscription;
       _subscription = null;
+      await sub?.cancel();
       return;
     }
 
     // Non-force mode: prevent new events but keep existing ones active
-    final queuedCount = _eventQueue.length;
-    final activeCount = _activeEvents.length;
+    final queuedCount = eventQueue.length;
+    final activeCount = activeEvents.length;
     final totalCount = queuedCount + activeCount;
 
     if (totalCount == 0) {
       _isActive = false;
       _completeWaitingCompleter();
       final sub = _subscription;
-      if (sub != null) {
-        await sub.cancel();
-      }
       _subscription = null;
+      await sub?.cancel();
       return;
     }
 
-    // Collect futures directly without copying lists
-    final futures = <Future<dynamic>>[];
-    // Add queued events - iterate directly over Queue
-    for (final event in _eventQueue) {
-      futures.add(event.completer.future);
-    }
-    // Add active events - iterate directly over Set
-    for (final event in _activeEvents) {
-      futures.add(event.completer.future);
-    }
+    // Pre-allocate futures list with known size
+    final futures = eventQueue
+        .map((e) => e._completer.future)
+        .followedBy(activeEvents.map((e) => e._completer.future));
 
     // Wake up the stream processor to start processing queued events
     _completeWaitingCompleter();
@@ -240,8 +229,9 @@ class _TaskStream {
     _completeWaitingCompleter();
 
     // Cancel the subscription
-    await _subscription?.cancel();
+    final sub = _subscription;
     _subscription = null;
+    await sub?.cancel();
   }
 }
 
@@ -407,8 +397,8 @@ const int _asFutureCompletedBit = 1 << 4;
 /// Stream implementation that allows us to detect cancellation without
 /// relying on [StreamController].
 class _SinglePipelineEventStream extends Stream<dynamic> {
-  final _PipelineEvent<dynamic> event;
-  final void Function(_PipelineEvent<dynamic> event) onStreamClosed;
+  final PipelineEventContext event;
+  final void Function(PipelineEventContext event) onStreamClosed;
 
   _SinglePipelineEventStream._(this.event, this.onStreamClosed);
 
@@ -429,8 +419,8 @@ class _SinglePipelineEventStream extends Stream<dynamic> {
 }
 
 class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
-  final _PipelineEvent<dynamic> event;
-  final void Function(_PipelineEvent<dynamic> event) onStreamClosed;
+  final PipelineEventContext event;
+  final void Function(PipelineEventContext event) onStreamClosed;
   void Function(dynamic event)? _onData;
   void Function()? _onDone;
 
@@ -440,7 +430,8 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   Object? _lastData;
   Object? _lastError;
   StackTrace? _lastStackTrace;
-  final List<_AsFutureRequest<Object?>> _asFutureRequests = [];
+  // Lazy initialization - most events don't use asFuture
+  List<_AsFutureRequest<Object?>>? _asFutureRequests;
 
   _SinglePipelineEventSubscription._(
     this.event,
@@ -452,61 +443,41 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   }
 
   Future<void> _run() async {
-    event._stopwatch.start();
+    final evt = event; // Cache for hot path
+    evt._startTiming();
     try {
-      final future = Future.sync(() => event.task(event.context));
-      final result = await future;
-      if (_shouldEmit) {
+      // Future.sync wraps synchronous exceptions into Future errors
+      final result = await Future.sync(() => evt._task(evt));
+      final statusFlag = _statusFlag;
+      if (!statusFlag.hasFlag(_canceledBit) && !evt._isCancelled) {
         await _completeWithResult(result);
       } else {
         // Task was cancelled, but still complete the completer to avoid hanging
-        _tryCompleteCompleter(() => event.completer.complete(result));
+        final completer = evt._completer;
+        if (!completer.isCompleted) {
+          completer.complete(result);
+        }
       }
     } catch (error, stackTrace) {
       // Always propagate error through completer FIRST, before any other processing
       // This ensures the error reaches the caller of run() immediately
-      // Don't use runGuarded here - we want the error to propagate through the Future
-      // The error will be caught by expectLater or try-catch in the caller
-      if (!event.completer.isCompleted) {
-        event.completer.completeError(error, stackTrace);
+      final completer = evt._completer;
+      if (!completer.isCompleted) {
+        completer.completeError(error, stackTrace);
       }
       // Then handle error through stream subscription if needed
-      // We need to await this to ensure onDone is called before _closeStream
-      // This is important for asyncExpand to work correctly
-      if (_shouldEmit) {
+      final statusFlag = _statusFlag;
+      if (!statusFlag.hasFlag(_canceledBit) && !evt._isCancelled) {
         await _completeWithError(error, stackTrace);
       } else {
         // Even if not emitting, we need to signal completion for asyncExpand
-        // Call onDone directly since we're not going through _completeWithError
         _invokeDoneHandlerIfNeeded();
       }
     } finally {
-      event._stopwatch.stop();
+      evt._stopTiming();
       // Close stream in finally to ensure it's always called
-      // This removes the event from active events, allowing other events to process
       _closeStream();
     }
-  }
-
-  @pragma('vm:prefer-inline')
-  bool get _shouldEmit =>
-      !_statusFlag.hasFlag(_canceledBit) && !event._isCancelled;
-
-  @pragma('vm:prefer-inline')
-  void _tryCompleteCompleter(void Function() complete) {
-    final eventCompleter = event.completer;
-    if (!eventCompleter.isCompleted) {
-      complete();
-    }
-  }
-
-  @pragma('vm:prefer-inline')
-  Future<void> _waitForResumeIfPaused() async {
-    if (!_statusFlag.hasFlag(_pausedBit)) return;
-    if (_statusFlag.hasFlag(_canceledBit)) return;
-    final resumeCompleter = _resumeCompleter ??= Completer<void>();
-    await resumeCompleter.future;
-    _resumeCompleter = null;
   }
 
   @pragma('vm:prefer-inline')
@@ -514,21 +485,30 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
 
   @pragma('vm:prefer-inline')
   void _invokeDoneHandlerIfNeeded() {
-    if (_statusFlag.hasFlag(_didCallDoneBit)) return;
-    // Don't call onDone if subscription is canceled - it may cause assertion errors
-    if (_statusFlag.hasFlag(_canceledBit)) return;
-    _statusFlag = _statusFlag.setFlag(_didCallDoneBit);
+    final statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_didCallDoneBit)) return;
+    // Don't call onDone if subscription is canceled
+    if (statusFlag.hasFlag(_canceledBit)) return;
+    _statusFlag = statusFlag.setFlag(_didCallDoneBit);
     _onDone?.call();
   }
 
   Future<void> _completeWithResult(dynamic result) async {
-    _tryCompleteCompleter(() => event.completer.complete(result));
+    final completer = event._completer;
+    if (!completer.isCompleted) {
+      completer.complete(result);
+    }
     _lastData = result;
-    _lastError = null;
-    _lastStackTrace = null;
 
-    await _waitForResumeIfPaused();
-    if (_statusFlag.hasFlag(_canceledBit)) return;
+    // Wait for resume if paused
+    var statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_pausedBit) && !statusFlag.hasFlag(_canceledBit)) {
+      final resumeCompleter = _resumeCompleter ??= Completer<void>();
+      await resumeCompleter.future;
+      _resumeCompleter = null;
+      statusFlag = _statusFlag;
+    }
+    if (statusFlag.hasFlag(_canceledBit)) return;
 
     _invokeDataHandler(result);
     _invokeDoneHandlerIfNeeded();
@@ -536,49 +516,44 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   }
 
   Future<void> _completeWithError(Object error, StackTrace stackTrace) async {
-    // Completer is already completed with error in _run(), so we just need to
-    // handle stream subscription callbacks here
+    // Completer is already completed with error in _run()
     // Wrap everything in try-catch to ensure errors don't stop pipeline processing
     try {
       _lastError = error;
       _lastStackTrace = stackTrace;
 
-      // Don't wait for resume if paused - error is already propagated through completer
-      // This prevents blocking when error occurs. If paused, resume immediately.
-      if (_statusFlag.hasFlag(_pausedBit) &&
-          !_statusFlag.hasFlag(_canceledBit)) {
+      final statusFlag = _statusFlag;
+      // Don't wait for resume if paused - error is already propagated
+      if (statusFlag.hasFlag(_pausedBit) && !statusFlag.hasFlag(_canceledBit)) {
         _completeResumeCompleter(); // Resume immediately to avoid blocking
       }
 
-      if (_statusFlag.hasFlag(_canceledBit)) return;
+      if (statusFlag.hasFlag(_canceledBit)) return;
 
       _completeAsFutureWithError(error, stackTrace);
-      // Don't call onDone here - it will be called in _closeStream if needed
-      // Calling it here can cause issues with asyncExpand's internal StreamController
     } catch (_) {
       // If error handling itself throws, don't let it stop pipeline
-      // The completer is already completed with the original error
-      // Just ignore the secondary error to keep pipeline running
     }
   }
 
   @pragma('vm:prefer-inline')
   void _closeStream() {
-    if (_statusFlag.hasFlag(_closedBit)) return;
-    _statusFlag = _statusFlag.setFlag(_closedBit);
-    onStreamClosed(event);
-    if (!_statusFlag.hasFlag(_canceledBit) &&
-        !event.completer.isCompleted &&
-        !event._isCancelled) {
-      event.cancel();
+    var statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_closedBit)) return;
+    _statusFlag = statusFlag = statusFlag.setFlag(_closedBit);
+
+    final evt = event;
+    onStreamClosed(evt);
+
+    if (!statusFlag.hasFlag(_canceledBit) &&
+        !evt._completer.isCompleted &&
+        !evt._isCancelled) {
+      evt._cancel();
     }
     if (_lastError == null) {
       _completeAsFutureWithSuccess();
     }
     // Always call onDone when stream closes to signal completion to asyncExpand
-    // This ensures asyncExpand can continue processing subsequent events
-    // This is critical - without it, asyncExpand will wait forever for stream to complete
-    // Call it here in _closeStream() to ensure proper order and avoid issues
     _invokeDoneHandlerIfNeeded();
     _completeResumeCompleter();
     // Clear references to help GC
@@ -589,11 +564,12 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
 
   @override
   Future<void> cancel() {
-    if (_statusFlag.hasFlag(_canceledBit)) {
+    final statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_canceledBit)) {
       return _taskFuture ?? const SynchronousFuture<void>(null);
     }
-    _statusFlag = _statusFlag.setFlag(_canceledBit);
-    event.cancel();
+    _statusFlag = statusFlag.setFlag(_canceledBit);
+    event._cancel();
     _completeResumeCompleter();
     return _taskFuture ?? const SynchronousFuture<void>(null);
   }
@@ -613,15 +589,17 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
 
   @override
   void pause([Future<void>? resumeSignal]) {
-    if (_statusFlag.hasFlag(_pausedBit | _canceledBit)) return;
-    _statusFlag = _statusFlag.setFlag(_pausedBit);
+    final statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_pausedBit | _canceledBit)) return;
+    _statusFlag = statusFlag.setFlag(_pausedBit);
     resumeSignal?.whenComplete(resume);
   }
 
   @override
   void resume() {
-    if (!_statusFlag.hasFlag(_pausedBit)) return;
-    _statusFlag = _statusFlag.clearFlag(_pausedBit);
+    final statusFlag = _statusFlag;
+    if (!statusFlag.hasFlag(_pausedBit)) return;
+    _statusFlag = statusFlag.clearFlag(_pausedBit);
     _completeResumeCompleter();
   }
 
@@ -639,41 +617,46 @@ class _SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
 
   @override
   Future<E> asFuture<E>([E? futureValue]) {
-    if (_statusFlag.hasFlag(_asFutureCompletedBit)) {
-      if (_lastError != null) {
-        return Future<E>.error(_lastError!, _lastStackTrace);
+    final statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_asFutureCompletedBit)) {
+      final lastError = _lastError;
+      if (lastError != null) {
+        return Future<E>.error(lastError, _lastStackTrace);
       }
-      return Future<E>.value(futureValue ?? _lastData as E);
+      return SynchronousFuture<E>(futureValue ?? _lastData as E);
     }
     final request = _AsFutureRequest<E>(
       futureValue: futureValue,
       completer: Completer<E>.sync(),
     );
-    _asFutureRequests.add(request);
+    (_asFutureRequests ??= []).add(request);
     return request.completer.future;
   }
 
   @pragma('vm:prefer-inline')
   void _completeAsFutureWithSuccess() {
-    if (_statusFlag.hasFlag(_asFutureCompletedBit)) return;
+    final statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_asFutureCompletedBit)) return;
     final requests = _asFutureRequests;
+    if (requests == null || requests.isEmpty) return;
+    _statusFlag = statusFlag.setFlag(_asFutureCompletedBit);
     final length = requests.length;
-    if (length == 0) return;
-    _statusFlag = _statusFlag.setFlag(_asFutureCompletedBit);
+    final lastData = _lastData;
     // Use indexed loop for better performance
     for (var index = 0; index < length; index++) {
-      requests[index].completeSuccess(_lastData);
+      requests[index].completeSuccess(lastData);
     }
     requests.clear();
   }
 
   @pragma('vm:prefer-inline')
   void _completeAsFutureWithError(Object error, StackTrace stackTrace) {
-    if (_statusFlag.hasFlag(_asFutureCompletedBit)) return;
+    final statusFlag = _statusFlag;
+    if (statusFlag.hasFlag(_asFutureCompletedBit)) return;
     final requests = _asFutureRequests;
+    if (requests == null || requests.isEmpty) return;
+    _statusFlag = statusFlag.setFlag(_asFutureCompletedBit);
     final length = requests.length;
-    if (length == 0) return;
-    _statusFlag = _statusFlag.setFlag(_asFutureCompletedBit);
     // Use indexed loop for better performance
     for (var index = 0; index < length; index++) {
       requests[index].completeError(error, stackTrace);
