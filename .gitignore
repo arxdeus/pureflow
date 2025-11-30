@@ -66,7 +66,6 @@ fastlane/screenshots
 fastlane/test_output
 fastlane/readme.md
 
-
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Dart.gitignore
 
 # See https://www.dartlang.org/guides/libraries/private-files
@@ -83,7 +82,6 @@ pubspec.lock
 # If you don't generate documentation locally you can remove this line.
 doc/api/
 
-
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Global/Linux.gitignore
 
 *~
@@ -99,7 +97,6 @@ doc/api/
 
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
-
 
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Global/JetBrains.gitignore
 
@@ -156,7 +153,6 @@ fabric.properties
 # Editor-based Rest Client
 .idea/httpRequests
 
-
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Global/macOS.gitignore
 
 # General
@@ -166,7 +162,6 @@ fabric.properties
 
 # Icon must end with two \r
 Icon
-
 
 # Thumbnails
 ._*
@@ -187,7 +182,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Global/Vim.gitignore
 
 # Swap
@@ -206,7 +200,6 @@ Session.vim
 tags
 # Persistent undo
 [._]*.un~
-
 
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Global/Xcode.gitignore
 
@@ -234,7 +227,6 @@ DerivedData/
 *.perspectivev3
 !default.perspectivev3
 
-
 ### https://raw.github.com/github/gitignore/80a8803b004013d17291196825a327b9e871f009/Global/VisualStudioCode.gitignore
 
 .vscode/*
@@ -242,7 +234,6 @@ DerivedData/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-
 
 ## Custom
 # Google API key and other resources
@@ -252,3 +243,6 @@ google-services.json
 .flutter-plugins
 **.exe
 pubspec.lock
+
+# FVM Version Cache
+.fvm/
