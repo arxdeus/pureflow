@@ -5,6 +5,7 @@ publish_to: none
 
 environment:
   sdk: ^3.5.0
+  flutter: ">=3.24.0"
 
 dev_dependencies:
   test: ^1.28.0
@@ -13,6 +14,7 @@ dev_dependencies:
 
   pureflow: any
   meta: any
+
 workspace:
 - packages/pureflow
 - packages/pureflow_flutter
