@@ -6,8 +6,8 @@ void main() {
   // Basic Operations
   // ============================================================================
 
-  group('ValueUnit.batch - Basic Operations', () {
-    test('single signal update in batch', () {
+  group('ValueObservable.batch - Basic Operations', () {
+    test('single store update in batch', () {
       final s = Store(0);
       final c = Computed(() => s.value);
 
@@ -23,7 +23,7 @@ void main() {
       c.dispose();
     });
 
-    test('multiple updates to same signal in batch', () {
+    test('multiple updates to same store in batch', () {
       final s = Store(0);
       var computeCount = 0;
       final c = Computed(() {
@@ -90,7 +90,7 @@ void main() {
       sum.dispose();
     });
 
-    test('batch with signal and computed access', () {
+    test('batch with store and computed access', () {
       final s = Store(10);
       final c = Computed(() => s.value * 2);
 
@@ -117,7 +117,7 @@ void main() {
   // Notification Behavior
   // ============================================================================
 
-  group('ValueUnit.batch - Notification Behavior', () {
+  group('ValueObservable.batch - Notification Behavior', () {
     test('only notifies once after batch', () {
       final s = Store(0);
       var notifyCount = 0;
@@ -276,7 +276,7 @@ void main() {
   // Nesting
   // ============================================================================
 
-  group('ValueUnit.batch - Nesting', () {
+  group('ValueObservable.batch - Nesting', () {
     test('nested batch two levels', () {
       final s = Store(0);
       var computeCount = 0;
@@ -428,7 +428,7 @@ void main() {
   // Error Handling
   // ============================================================================
 
-  group('ValueUnit.batch - Error Handling', () {
+  group('ValueObservable.batch - Error Handling', () {
     test('exception in batch still flushes', () {
       final s = Store(0);
       final c = Computed(() => s.value);
@@ -538,13 +538,13 @@ void main() {
   // Edge Cases
   // ============================================================================
 
-  group('ValueUnit.batch - Edge Cases', () {
+  group('ValueObservable.batch - Edge Cases', () {
     test('empty batch', () {
       final result = batch(() {});
       expect(result, isNull);
     });
 
-    test('batch with no signal changes', () {
+    test('batch with no store changes', () {
       final s = Store(42);
       var computeCount = 0;
       final c = Computed(() {
@@ -567,7 +567,7 @@ void main() {
       c.dispose();
     });
 
-    test('batch after signal dispose', () {
+    test('batch after store dispose', () {
       final s = Store(0);
       final c = Computed(() => s.value);
 
@@ -584,7 +584,7 @@ void main() {
       c.dispose();
     });
 
-    test('batch with disposed signal among others', () {
+    test('batch with disposed store among others', () {
       final a = Store(1);
       final b = Store(2);
       final sum = Computed(() => a.value + b.value);
@@ -674,9 +674,9 @@ void main() {
         s.value = 0; // Back to original
       });
 
-      // Value is same as original, but signal was modified during batch
+      // Value is same as original, but store was modified during batch
       expect(c.value, 0);
-      // The signal was in the batch list, so it notifies once
+      // The store was in the batch list, so it notifies once
       expect(computeCount, 2);
 
       s.dispose();
@@ -688,7 +688,7 @@ void main() {
   // Performance
   // ============================================================================
 
-  group('ValueUnit.batch - Performance', () {
+  group('ValueObservable.batch - Performance', () {
     test('many signals in single batch', () {
       final signals = List.generate(100, (i) => Store(0));
       var computeCount = 0;
@@ -715,7 +715,7 @@ void main() {
       sum.dispose();
     });
 
-    test('many updates to single signal in batch', () {
+    test('many updates to single store in batch', () {
       final s = Store(0);
       var computeCount = 0;
       final c = Computed(() {
@@ -810,7 +810,7 @@ void main() {
   // Complex Scenarios
   // ============================================================================
 
-  group('ValueUnit.batch - Complex Scenarios', () {
+  group('ValueObservable.batch - Complex Scenarios', () {
     test('batch with computed chain', () {
       final s = Store(1);
       final c1 = Computed(() => s.value * 2);
@@ -985,7 +985,7 @@ void main() {
       c.dispose();
     });
 
-    test('batch with list signal updates', () {
+    test('batch with list store updates', () {
       final list = Store<List<int>>([1, 2, 3]);
       final sum = Computed(() => list.value.fold<int>(0, (a, b) => a + b));
 
@@ -1002,7 +1002,7 @@ void main() {
       sum.dispose();
     });
 
-    test('batch with boolean signal toggles', () {
+    test('batch with boolean store toggles', () {
       final toggle = Store(false);
       var computeCount = 0;
       final c = Computed(() {
@@ -1028,7 +1028,7 @@ void main() {
       c.dispose();
     });
 
-    test('batch with string signal updates', () {
+    test('batch with string store updates', () {
       final text = Store('hello');
       final length = Computed(() => text.value.length);
 
@@ -1045,7 +1045,7 @@ void main() {
       length.dispose();
     });
 
-    test('batch with map signal', () {
+    test('batch with map store', () {
       final map = Store<Map<String, int>>({'a': 1});
       final keys = Computed(() => map.value.keys.toList()..sort());
 

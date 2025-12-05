@@ -2,10 +2,10 @@ import 'package:pureflow/src/implementation/state/store_impl.dart';
 import 'package:pureflow/src/interfaces.dart';
 
 // ============================================================================
-// Store (Signal) - Public Interface
+// Store - Public Interface
 // ============================================================================
 
-/// A reactive signal that holds a single mutable value.
+/// A reactive store that holds a single mutable value.
 ///
 /// [Store] is the fundamental building block for reactive state management
 /// in Pureflow. It wraps a value of type [T] and automatically notifies
@@ -68,8 +68,8 @@ import 'package:pureflow/src/interfaces.dart';
 ///
 /// ## Type Parameters
 ///
-/// - [T]: The type of value stored in this reactive signal.
-abstract class Store<T> implements ReactiveValueHolder<T> {
+/// - [T]: The type of value stored in this reactive store.
+abstract class Store<T> implements ReactiveValueObservable<T> {
   /// Creates a new [Store] with the given initial [value].
   ///
   /// The store is immediately ready for use after construction.

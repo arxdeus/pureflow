@@ -28,14 +28,13 @@ class SinglePipelineEventStream extends Stream<dynamic> {
     Function? onError,
     void Function()? onDone,
     bool? cancelOnError,
-  }) {
-    return SinglePipelineEventSubscription(
-      event,
-      onStreamClosed,
-      onData,
-      onDone,
-    );
-  }
+  }) =>
+      SinglePipelineEventSubscription(
+        event,
+        onStreamClosed,
+        onData,
+        onDone,
+      );
 }
 
 @internal
@@ -90,7 +89,7 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
       if (!statusFlag.hasFlag(canceledBit) && evt.isActive) {
         await _completeWithError(error, stackTrace);
       } else {
-        // Even if not emitting, we need to signal completion for asyncExpand
+        // Even if not emitting, we need to store completion for asyncExpand
         _invokeDoneHandlerIfNeeded();
       }
     } finally {
@@ -172,7 +171,7 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     if (_lastError == null) {
       _completeAsFutureWithSuccess();
     }
-    // Always call onDone when stream closes to signal completion to asyncExpand
+    // Always call onDone when stream closes to store completion to asyncExpand
     _invokeDoneHandlerIfNeeded();
     _completeResumeCompleter();
     // Clear references to help GC

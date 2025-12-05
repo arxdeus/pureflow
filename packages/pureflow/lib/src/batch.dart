@@ -75,10 +75,10 @@ void _flushBatch() {
   if (count == 0) return;
 
   for (var i = 0; i < count; i++) {
-    final signal = batchBuffer[i]!;
-    signal.inBatch = false;
-    if (!signal.status.hasFlag(disposedBit)) {
-      signal.notifySubscribers();
+    final store = batchBuffer[i]!;
+    store.inBatch = false;
+    if (!store.status.hasFlag(disposedBit)) {
+      store.notifySubscribers();
     }
     batchBuffer[i] = null; // Avoid memory leak
   }

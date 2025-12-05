@@ -22,7 +22,7 @@ export 'reactive_subscription.dart';
 /// Uses separate linked lists for callback listeners and reactive dependencies.
 @internal
 abstract class ReactiveSource<T> extends Stream<T>
-    implements ValueHolder<T>, ReactiveSourceLike<T> {
+    implements ValueObservable<T>, ReactiveSourceLike<T> {
   /// Head of linked list of callback listeners.
   ListenerNode? listeners;
 

@@ -7,7 +7,7 @@ library;
 
 export 'src/batch.dart' show batch;
 export 'src/computed.dart' show Computed;
-export 'src/interfaces.dart' show Observable, ValueHolder;
+export 'src/interfaces.dart' show Observable, ValueObservable;
 export 'src/pipeline.dart'
     show EventMapper, EventTransformer, Pipeline, PipelineEventContext;
 export 'src/store.dart' show Store;

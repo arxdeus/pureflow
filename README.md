@@ -481,7 +481,7 @@ ValueListenableBuilder<String>(
 
 ### Zero-Overhead Adapter
 
-The `ValueUnitListenable` adapter is designed for maximum efficiency:
+The `ValueObservableAdapter` adapter is designed for maximum efficiency:
 
 - **No allocation per access** — Instances are cached and bound using `Expando`
 - **Direct delegation** — All operations forward to Pureflow's listener system

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:pureflow/pureflow.dart' as pureflow;
 
-/// A zero-allocation adapter that exposes a Pureflow `ValueHolder` as a Flutter
+/// A zero-allocation adapter that exposes a Pureflow `ValueObservable` as a Flutter
 /// [ValueListenable].
 ///
 /// This adapter enables seamless integration between Pureflow's reactive system
@@ -25,7 +25,7 @@ import 'package:pureflow/pureflow.dart' as pureflow;
 ///
 /// Widget build(BuildContext context) {
 ///   return ValueListenableBuilder<int>(
-///     valueListenable: ValueUnitListenable(counter),
+///     valueListenable: ValueObservableAdapter(counter),
 ///     builder: (context, value, child) {
 ///       return Text('Count: $value');
 ///     },
@@ -35,7 +35,7 @@ import 'package:pureflow/pureflow.dart' as pureflow;
 ///
 /// ## Using the Extension
 ///
-/// For cleaner syntax, use the [ValueUnitFlutterX.asListenable] extension:
+/// For cleaner syntax, use the [ValueObservableFlutterX.asListenable] extension:
 ///
 /// ```dart
 /// ValueListenableBuilder<int>(
@@ -46,49 +46,49 @@ import 'package:pureflow/pureflow.dart' as pureflow;
 ///
 /// ## Caching Behavior
 ///
-/// The factory constructor ensures only one [ValueUnitListenable] instance exists
+/// The factory constructor ensures only one [ValueObservableAdapter] instance exists
 /// per source. This means:
 ///
 /// ```dart
 /// final counter = Store<int>(0);
-/// final a = ValueUnitListenable(counter);
-/// final b = ValueUnitListenable(counter);
+/// final a = ValueObservableAdapter(counter);
+/// final b = ValueObservableAdapter(counter);
 /// print(identical(a, b)); // true
 /// ```
 ///
 /// ## Type Parameters
 ///
 /// - [T]: The type of value held by the source and exposed by this listenable.
-class ValueUnitListenable<T> implements ValueListenable<T> {
-  /// Creates or retrieves a cached [ValueUnitListenable] for the given source.
+class ValueObservableAdapter<T> implements ValueListenable<T> {
+  /// Creates or retrieves a cached [ValueObservableAdapter] for the given source.
   ///
   /// This factory constructor uses an [Expando] to cache instances, ensuring
   /// that only one adapter exists per source. This prevents memory leaks and
   /// ensures consistent behavior across the application.
   ///
   /// ## Parameters
-  /// - [source]: A Pureflow `ValueHolder` (typically a `Store` or `Computed`)
+  /// - [source]: A Pureflow `ValueObservable` (typically a `Store` or `Computed`)
   ///   to adapt to Flutter's `ValueListenable` interface.
   ///
   /// ## Returns
-  /// A [ValueUnitListenable] that wraps the source. If an adapter for this
+  /// A [ValueObservableAdapter] that wraps the source. If an adapter for this
   /// source already exists, returns the cached instance.
   ///
   /// ## Example
   /// ```dart
   /// final store = Store<String>('Hello');
-  /// final listenable = ValueUnitListenable(store);
+  /// final listenable = ValueObservableAdapter(store);
   /// ```
   @pragma('vm:prefer-inline')
-  factory ValueUnitListenable(pureflow.ValueHolder<T> source) =>
-      (_listenables[source] ??= ValueUnitListenable<T>._(source))
-          as ValueUnitListenable<T>;
+  factory ValueObservableAdapter(pureflow.ValueObservable<T> source) =>
+      (_listenables[source] ??= ValueObservableAdapter<T>._(source))
+          as ValueObservableAdapter<T>;
 
-  const ValueUnitListenable._(this._source);
+  const ValueObservableAdapter._(this._source);
 
-  static final _listenables = Expando<ValueUnitListenable<Object?>>();
+  static final _listenables = Expando<ValueObservableAdapter<Object?>>();
 
-  final pureflow.ValueHolder<T> _source;
+  final pureflow.ValueObservable<T> _source;
 
   /// The current value of the underlying source.
   ///
@@ -96,12 +96,12 @@ class ValueUnitListenable<T> implements ValueListenable<T> {
   /// providing zero-overhead access to the current value.
   ///
   /// ## Returns
-  /// The current value of type [T] from the underlying `ValueHolder`.
+  /// The current value of type [T] from the underlying `ValueObservable`.
   ///
   /// ## Example
   /// ```dart
   /// final counter = Store<int>(42);
-  /// final listenable = ValueUnitListenable(counter);
+  /// final listenable = ValueObservableAdapter(counter);
   /// print(listenable.value); // 42
   /// ```
   @override
@@ -121,7 +121,7 @@ class ValueUnitListenable<T> implements ValueListenable<T> {
   /// ## Example
   /// ```dart
   /// final counter = Store<int>(0);
-  /// final listenable = ValueUnitListenable(counter);
+  /// final listenable = ValueObservableAdapter(counter);
   ///
   /// listenable.addListener(() {
   ///   print('Value changed to: ${listenable.value}');
@@ -161,15 +161,15 @@ class ValueUnitListenable<T> implements ValueListenable<T> {
       _source.removeListener(listener);
 }
 
-extension ValueUnitFlutterX<T> on pureflow.ValueHolder<T> {
+extension ValueObservableAdapterExtension<T> on pureflow.ValueObservable<T> {
   /// Creates a lightweight read-only view as a Flutter [ValueListenable].
   ///
   /// This getter provides zero-overhead access to a [ValueListenable] wrapper
-  /// around this `ValueHolder`. The returned adapter simply delegates all
+  /// around this `ValueObservable`. The returned adapter simply delegates all
   /// operations to this source.
   ///
   /// ## Returns
-  /// A `ValueListenable` that wraps this `ValueHolder` and provides read-only
+  /// A `ValueListenable` that wraps this `ValueObservable` and provides read-only
   /// access to its value.
   ///
   /// ## Example
@@ -199,5 +199,5 @@ extension ValueUnitFlutterX<T> on pureflow.ValueHolder<T> {
   /// print(identical(store.asListenable, store.asListenable)); // true
   /// ```
   @pragma('vm:prefer-inline')
-  ValueListenable<T> get asListenable => ValueUnitListenable<T>(this);
+  ValueListenable<T> get asListenable => ValueObservableAdapter<T>(this);
 }

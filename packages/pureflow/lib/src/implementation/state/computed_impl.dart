@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:meta/meta.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/common/equality.dart';
 import 'package:pureflow/src/computed.dart';
@@ -14,6 +15,7 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 // ============================================================================
 
 /// Implementation of [Computed].
+@internal
 class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   ComputedImpl(this._compute, {bool Function(T, T)? equality})
       : _equality = equality;

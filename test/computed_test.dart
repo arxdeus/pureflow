@@ -73,7 +73,7 @@ void main() {
   // ============================================================================
 
   group('CompositeView - Dependency Tracking', () {
-    test('tracks single signal dependency', () {
+    test('tracks single store dependency', () {
       final s = Store(5);
       var computeCount = 0;
       final c = Computed(() {
@@ -92,7 +92,7 @@ void main() {
       c.dispose();
     });
 
-    test('tracks two signal dependencies', () {
+    test('tracks two store dependencies', () {
       final a = Store(1);
       final b = Store(2);
       final c = Computed(() => a.value + b.value);
@@ -110,7 +110,7 @@ void main() {
       c.dispose();
     });
 
-    test('tracks five signal dependencies', () {
+    test('tracks five store dependencies', () {
       final signals = List.generate(5, (i) => Store(i + 1));
       final c = Computed(() => signals.fold<int>(0, (sum, s) => sum + s.value));
 
@@ -125,7 +125,7 @@ void main() {
       c.dispose();
     });
 
-    test('tracks ten signal dependencies', () {
+    test('tracks ten store dependencies', () {
       final signals = List.generate(10, (i) => Store(1));
       final c = Computed(() => signals.fold<int>(0, (sum, s) => sum + s.value));
 
@@ -505,7 +505,7 @@ void main() {
       c2.dispose();
     });
 
-    test('dispose source signal', () {
+    test('dispose source store', () {
       final s = Store(42);
       final c = Computed(() => s.value * 2);
 
@@ -525,7 +525,7 @@ void main() {
   // ============================================================================
 
   group('CompositeView - Complex Scenarios', () {
-    test('many computeds from one signal', () {
+    test('many computeds from one store', () {
       final s = Store(10);
       final computeds = List.generate(20, (i) => Computed(() => s.value + i));
 
@@ -686,7 +686,7 @@ void main() {
       c.dispose();
     });
 
-    test('computed accessing multiple properties of same signal', () {
+    test('computed accessing multiple properties of same store', () {
       final s = Store<(int, String)>((1, 'hello'));
       final c = Computed(() => '${s.value.$1}: ${s.value.$2}');
 
@@ -815,7 +815,7 @@ void main() {
       // External change doesn't trigger recompute
       expect(c.value, 15);
 
-      s.value = 6; // Signal change triggers recompute
+      s.value = 6; // Store change triggers recompute
       expect(c.value, 26);
 
       s.dispose();

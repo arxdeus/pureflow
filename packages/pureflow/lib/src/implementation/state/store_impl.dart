@@ -1,3 +1,4 @@
+import 'package:meta/meta.dart';
 import 'package:pureflow/src/batch.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/common/equality.dart';
@@ -5,10 +6,11 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 import 'package:pureflow/src/store.dart';
 
 // ============================================================================
-// StoreImpl (Signal) - Optimized Implementation
+// StoreImpl (Store) - Optimized Implementation
 // ============================================================================
 
 /// Implementation of [Store].
+@internal
 class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   StoreImpl(this._value, {bool Function(T, T)? equality})
       : _equality = equality;

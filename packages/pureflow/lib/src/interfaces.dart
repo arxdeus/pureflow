@@ -86,14 +86,14 @@ abstract class Observable {
 /// ## Usage
 ///
 /// ```dart
-/// ValueHolder<int> counter = Store<int>(0);
+/// ValueObservable<int> counter = Store<int>(0);
 /// print(counter.value); // 0
 ///
 /// counter.addListener(() {
 ///   print('Counter changed to: ${counter.value}');
 /// });
 /// ```
-abstract class ValueHolder<T> implements Observable {
+abstract class ValueObservable<T> implements Observable {
   /// The current value held by this object.
   ///
   /// Reading this property always returns the most up-to-date value.
@@ -115,9 +115,9 @@ abstract class ValueHolder<T> implements Observable {
   T get value;
 }
 
-/// A [ValueHolder] that also implements [Stream] for reactive data binding.
+/// A [ValueObservable] that also implements [Stream] for reactive data binding.
 ///
-/// This interface extends [ValueHolder] with [Stream] capabilities,
+/// This interface extends [ValueObservable] with [Stream] capabilities,
 /// enabling use with `StreamBuilder` and other stream-based consumers.
 /// It provides a bridge between the synchronous listener pattern and
 /// Dart's asynchronous stream pattern.
@@ -147,6 +147,6 @@ abstract class ValueHolder<T> implements Observable {
 ///   builder: (context, snapshot) => Text('Count: ${snapshot.data}'),
 /// );
 /// ```
-abstract class ReactiveValueHolder<T>
+abstract class ReactiveValueObservable<T>
     with Stream<T>
-    implements ValueHolder<T> {}
+    implements ValueObservable<T> {}

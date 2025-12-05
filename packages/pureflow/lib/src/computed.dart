@@ -81,7 +81,7 @@ import 'package:pureflow/src/interfaces.dart';
 /// - Computation is O(dependencies) for dependency tracking
 /// - Value access is O(1) when not dirty
 /// - Memory usage is proportional to the number of dependencies
-abstract class Computed<T> implements ReactiveValueHolder<T> {
+abstract class Computed<T> implements ReactiveValueObservable<T> {
   /// Creates a new [Computed] with the given computation function.
   ///
   /// The [compute] function defines how to derive the value from its

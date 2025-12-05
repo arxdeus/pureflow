@@ -54,11 +54,12 @@
 ///
 /// ## Performance
 ///
-/// The `ValueUnitListenable` adapter is designed for zero overhead:
+/// The `ValueObservableAdapter` adapter is designed for zero overhead:
 /// - No additional memory allocation per access
 /// - Instances are cached per source using `Expando`
 /// - Direct delegation to Pureflow's listener system
 library;
 
 export 'package:pureflow/pureflow.dart';
-export 'src/adapters.dart' show ValueUnitFlutterX, ValueUnitListenable;
+export 'src/adapters.dart'
+    show ValueObservableAdapter, ValueObservableAdapterExtension;

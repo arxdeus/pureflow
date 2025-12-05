@@ -6,26 +6,26 @@ void main() {
   // Basic Operations
   // ============================================================================
 
-  group('ValueUnit - Basic Operations', () {
-    test('creates signal with initial int value', () {
+  group('ValueObservable - Basic Operations', () {
+    test('creates store with initial int value', () {
       final s = Store(42);
       expect(s.value, 42);
       s.dispose();
     });
 
-    test('creates signal with initial double value', () {
+    test('creates store with initial double value', () {
       final s = Store(3.14);
       expect(s.value, 3.14);
       s.dispose();
     });
 
-    test('creates signal with initial String value', () {
+    test('creates store with initial String value', () {
       final s = Store('hello');
       expect(s.value, 'hello');
       s.dispose();
     });
 
-    test('creates signal with initial bool value', () {
+    test('creates store with initial bool value', () {
       final s = Store(true);
       expect(s.value, true);
       s.dispose();
@@ -75,7 +75,7 @@ void main() {
       s.dispose();
     });
 
-    test('dispose signal', () {
+    test('dispose store', () {
       final s = Store(42);
       s.dispose();
       // Should not throw
@@ -87,7 +87,7 @@ void main() {
   // Value Types
   // ============================================================================
 
-  group('ValueUnit - Value Types', () {
+  group('ValueObservable - Value Types', () {
     test('handles nullable int type with non-null value', () {
       final s = Store<int?>(42);
       expect(s.value, 42);
@@ -186,7 +186,7 @@ void main() {
   // Equality Behavior
   // ============================================================================
 
-  group('ValueUnit - Equality Behavior', () {
+  group('ValueObservable - Equality Behavior', () {
     test('same int value does not trigger computed recomputation', () {
       final s = Store(42);
       var computeCount = 0;
@@ -289,15 +289,15 @@ void main() {
   // Dispose Behavior
   // ============================================================================
 
-  group('ValueUnit - Dispose Behavior', () {
-    test('disposed signal ignores writes', () {
+  group('ValueObservable - Dispose Behavior', () {
+    test('disposed store ignores writes', () {
       final s = Store(42);
       s.dispose();
       s.value = 100; // Should be ignored
       expect(s.value, 42);
     });
 
-    test('disposed signal is still readable', () {
+    test('disposed store is still readable', () {
       final s = Store(42);
       s.dispose();
       expect(s.value, 42);
@@ -348,8 +348,8 @@ void main() {
   // Edge Cases
   // ============================================================================
 
-  group('ValueUnit - Edge Cases', () {
-    test('signal with deeply nested object', () {
+  group('ValueObservable - Edge Cases', () {
+    test('store with deeply nested object', () {
       final nested = {
         'level1': {
           'level2': {
@@ -362,7 +362,7 @@ void main() {
       s.dispose();
     });
 
-    test('signal as value of another signal', () {
+    test('store as value of another store', () {
       final inner = Store(42);
       final outer = Store(inner);
 
@@ -404,7 +404,7 @@ void main() {
       s.dispose();
     });
 
-    test('signal with function type', () {
+    test('store with function type', () {
       int Function(int) fn(int multiplier) => (x) => x * multiplier;
       final s = Store(fn(2));
       expect(s.value(5), 10);
@@ -414,13 +414,13 @@ void main() {
       s.dispose();
     });
 
-    test('signal with Future type', () async {
+    test('store with Future type', () async {
       final s = Store(Future.value(42));
       expect(await s.value, 42);
       s.dispose();
     });
 
-    test('signal with DateTime', () {
+    test('store with DateTime', () {
       final now = DateTime.now();
       final s = Store(now);
       expect(s.value, now);
@@ -431,7 +431,7 @@ void main() {
       s.dispose();
     });
 
-    test('signal with Duration', () {
+    test('store with Duration', () {
       final s = Store(const Duration(seconds: 30));
       expect(s.value.inSeconds, 30);
       s.value = const Duration(minutes: 1);
@@ -439,7 +439,7 @@ void main() {
       s.dispose();
     });
 
-    test('signal with enum value', () {
+    test('store with enum value', () {
       final s = Store(_TestEnum.first);
       expect(s.value, _TestEnum.first);
       s.value = _TestEnum.second;
@@ -447,7 +447,7 @@ void main() {
       s.dispose();
     });
 
-    test('signal preserves object identity', () {
+    test('store preserves object identity', () {
       final obj = _TestObject(1, 'test');
       final s = Store(obj);
       expect(identical(s.value, obj), true);
@@ -461,7 +461,7 @@ void main() {
       s.dispose();
     });
 
-    test('signal with record type', () {
+    test('store with record type', () {
       final s = Store<(int, String)>((1, 'hello'));
       expect(s.value.$1, 1);
       expect(s.value.$2, 'hello');
@@ -476,8 +476,8 @@ void main() {
   // CompositeView Integration
   // ============================================================================
 
-  group('ValueUnit - CompositeView Integration', () {
-    test('computed tracks signal dependency', () {
+  group('ValueObservable - CompositeView Integration', () {
+    test('computed tracks store dependency', () {
       final s = Store(10);
       final c = Computed(() => s.value * 2);
 
@@ -489,7 +489,7 @@ void main() {
       c.dispose();
     });
 
-    test('multiple computeds from single signal', () {
+    test('multiple computeds from single store', () {
       final s = Store(10);
       final c1 = Computed(() => s.value + 1);
       final c2 = Computed(() => s.value + 2);
@@ -511,7 +511,7 @@ void main() {
       c3.dispose();
     });
 
-    test('signal update propagates through chain', () {
+    test('store update propagates through chain', () {
       final s = Store(1);
       final c1 = Computed(() => s.value + 1);
       final c2 = Computed(() => c1.value + 1);
@@ -527,7 +527,7 @@ void main() {
       c3.dispose();
     });
 
-    test('reading signal outside computed does not create dependency', () {
+    test('reading store outside computed does not create dependency', () {
       final s = Store(42);
       final value = s.value; // Read outside computed
 
