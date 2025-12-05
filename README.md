@@ -16,14 +16,13 @@ Pureflow provides a minimal, fast, and type-safe reactive state management solut
 
 ## Features
 
-- **🚀 Blazing Fast** — Faster than most of the packages in all benchmarks
-- **🎯 Type-Safe** — Full type inference with no runtime surprises
-- **🔗 Automatic Dependency Tracking** — Computed values track dependencies automatically
-- **📦 Lazy Evaluation** — Computations only run when accessed
-- **🔄 Batching** — Group multiple updates into a single notification
-- **⚡ Zero-Allocation Listeners** — Linked list-based listener management
-- **🌊 Stream Integration** — Every reactive value is also a `Stream`
-- **🎛️ Controlled Async** — Pipeline system for handling concurrency of async operations
+- **🎯 Type-Safe** - Full type inference with no runtime surprises
+- **🎛️ Controlled Async** - Pipeline system for handling concurrency of async operations
+- **🔗 Automatic Dependency Tracking** - Computed values track dependencies automatically
+- **📦 Lazy Evaluation** - Computations only run when accessed
+- **🔄 Batching** - Group multiple updates into a single notification
+- **⚡ Zero-Allocation Listeners** - Linked list-based listener management
+- **🌊 Stream Integration** - Every reactive value is also a `Stream`
 
 ---
 
@@ -87,7 +86,7 @@ You can provide a custom equality function for advanced use cases:
 ```dart
 // Deep list comparison
 final items = Store<List<int>>([1, 2, 3],
-  equality: (a, b) => listequality(a,b),
+  equality: (a, b) => listEquals(a, b),
 );
 
 // Custom object comparison
@@ -104,7 +103,7 @@ Every `Store` and `Computed` is also a `Stream`, making it compatible with `Stre
 final name = Store<String>('Alice');
 
 // Subscribe to changes
-name.listen((value) {
+final sub = name.listen((value) {
   print('Name is now: $value');
 });
 ```
@@ -130,7 +129,7 @@ print(fullName.value); // Jane Doe (automatically recomputed)
 
 #### Lazy Evaluation
 
-Computations are lazy — they only run when their value is accessed:
+Computations are lazy - they only run when their value is accessed:
 
 ```dart
 final expensive = Computed(() {
@@ -172,7 +171,7 @@ final filtered = Computed(() => items.value.where((x) => x > 0).toList());
 // With custom equality: only notifies if list contents actually changed
 final filteredWithequality = Computed(
   () => items.value.where((x) => x > 0).toList(),
-  equality: (a, b) => listequality(a, b),
+  equality: (a, b) => listEquals(a, b),
 );
 ```
 
@@ -325,7 +324,85 @@ await pipeline.dispose();
 
 // Cancel immediately
 await pipeline.dispose(force: true);
+
+---
+
 ```
+## Flutter Integration
+
+The `pureflow_flutter` package provides seamless integration with Flutter's widget system through zero-overhead adapters.
+
+### Installation
+
+```yaml
+dependencies:
+  pureflow_flutter: ^1.0.0
+```
+
+### Usage with ValueListenableBuilder
+
+The `asListenable` extension converts any `Store` or `Computed` to a Flutter `ValueListenable`:
+
+```dart
+import 'package:pureflow/pureflow.dart';
+import 'package:pureflow_flutter/pureflow_flutter.dart';
+
+class CounterPage extends StatelessWidget {
+  final counter = Store<int>(0);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: counter.asListenable,
+      builder: (context, value, child) {
+        return Text('Count: $value');
+      },
+    );
+  }
+}
+```
+
+### Usage with AnimatedBuilder
+
+Since `ValueListenable` extends `Listenable`, you can use Pureflow with any widget that accepts a `Listenable`:
+
+```dart
+AnimatedBuilder(
+  animation: counter.asListenable,
+  builder: (context, child) => Text('${counter.value}'),
+);
+```
+
+### Computed Values in Flutter
+
+Computed values work seamlessly with Flutter widgets:
+
+```dart
+final firstName = Store<String>('John');
+final lastName = Store<String>('Doe');
+final fullName = Computed(() => '${firstName.value} ${lastName.value}');
+
+// In widget
+ValueListenableBuilder<String>(
+  valueListenable: fullName.asListenable,
+  builder: (context, name, child) => Text('Hello, $name!'),
+);
+```
+
+### Zero-Overhead Adapter
+
+The `ValueObservableAdapter` adapter is designed for maximum efficiency:
+
+- **No allocation per access** - Instances are cached and bound using `Expando`
+- **Direct delegation** - All operations forward to Pureflow's listener system
+- **Cached instances** - Same source always returns the same adapter
+
+```dart
+final store = Store<int>(0);
+print(identical(store.asListenable, store.asListenable)); // true
+```
+
+---
 
 ---
 
@@ -418,97 +495,6 @@ In benchmarks, Pureflow outperforms popular packages almost across all operation
 
 ---
 
-## Flutter Integration
-
-The `pureflow_flutter` package provides seamless integration with Flutter's widget system through zero-overhead adapters.
-
-### Installation
-
-```yaml
-dependencies:
-  pureflow_flutter: ^1.0.0
-```
-
-### Usage with ValueListenableBuilder
-
-The `asListenable` extension converts any `Store` or `Computed` to a Flutter `ValueListenable`:
-
-```dart
-import 'package:pureflow/pureflow.dart';
-import 'package:pureflow_flutter/pureflow_flutter.dart';
-
-class CounterPage extends StatelessWidget {
-  final counter = Store<int>(0);
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: counter.asListenable,
-      builder: (context, value, child) {
-        return Text('Count: $value');
-      },
-    );
-  }
-}
-```
-
-### Usage with AnimatedBuilder
-
-Since `ValueListenable` extends `Listenable`, you can use Pureflow with any widget that accepts a `Listenable`:
-
-```dart
-AnimatedBuilder(
-  animation: counter.asListenable,
-  builder: (context, child) => Text('${counter.value}'),
-);
-```
-
-### Computed Values in Flutter
-
-Computed values work seamlessly with Flutter widgets:
-
-```dart
-final firstName = Store<String>('John');
-final lastName = Store<String>('Doe');
-final fullName = Computed(() => '${firstName.value} ${lastName.value}');
-
-// In widget
-ValueListenableBuilder<String>(
-  valueListenable: fullName.asListenable,
-  builder: (context, name, child) => Text('Hello, $name!'),
-);
-```
-
-### Zero-Overhead Adapter
-
-The `ValueObservableAdapter` adapter is designed for maximum efficiency:
-
-- **No allocation per access** — Instances are cached and bound using `Expando`
-- **Direct delegation** — All operations forward to Pureflow's listener system
-- **Cached instances** — Same source always returns the same adapter
-
-```dart
-final store = Store<int>(0);
-print(identical(store.asListenable, store.asListenable)); // true
-```
-
----
-
-## API Reference
-
-### Store<T>
-
-| Member | Description |
-|--------|-------------|
-| `Store(T value, {equality?})` | Create a new store with initial value and optional custom equality |
-| `T value` | Get or set the current value |
-| `update(T Function(T))` | Update value using a function |
-| `addListener(VoidCallback)` | Register a change listener |
-| `removeListener(VoidCallback)` | Remove a change listener |
-| `listen(void Function(T))` | Subscribe as a stream |
-| `dispose()` | Release resources |
-| `static batch<R>(R Function())` | Batch multiple updates |
-
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
