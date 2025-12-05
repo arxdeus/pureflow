@@ -1,7 +1,6 @@
 // ignore_for_file: depend_on_referenced_packages
 
 import 'package:flutter/material.dart';
-import 'package:pureflow/pureflow.dart';
 import 'package:pureflow_flutter/pureflow_flutter.dart';
 
 void main() {
