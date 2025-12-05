@@ -35,7 +35,7 @@ import 'package:pureflow/pureflow.dart' as pureflow;
 ///
 /// ## Using the Extension
 ///
-/// For cleaner syntax, use the [ValueObservableFlutterX.asListenable] extension:
+/// For cleaner syntax, use the [ValueObservableAdapterExtension.asListenable] extension:
 ///
 /// ```dart
 /// ValueListenableBuilder<int>(
