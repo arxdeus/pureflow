@@ -61,7 +61,9 @@ jobs:
         shell: bash
         run: |
           sed -i "s/^version:.*/version: ${{ inputs.package-version }}/" packages/${{ inputs.package-name }}/pubspec.yaml
-          ls -d packages/* example | xargs -I{} sed -i "s/^  ${{ inputs.package-name }}: ^.*/  ${{ inputs.package-name }}: ^${{ inputs.package-version }}/" {}/pubspec.yaml
+          find packages example -name "pubspec.yaml" -type f | while read -r pubspec; do
+            sed -i "s/^  ${{ inputs.package-name }}: ^.*/  ${{ inputs.package-name }}: ^${{ inputs.package-version }}/" "$pubspec" || true
+          done
           echo "Version set to ${{ inputs.package-version }}"
 
       - name: Commit version update
