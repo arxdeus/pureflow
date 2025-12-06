@@ -18,5 +18,4 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
-  meta: any
-  synchronous_stream: ^1.0.2
+  meta: ^1.14.0
