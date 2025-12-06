@@ -1,6 +1,6 @@
 name: pureflow_flutter
 description: Flutter integration for the PureFlow reactive library
-version: 1.0.0
+version: 1.0.1
 repository: https://github.com/arxdeus/pureflow
 homepage: https://github.com/arxdeus/pureflow
 issue_tracker: https://github.com/arxdeus/pureflow/issues
