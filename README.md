@@ -491,7 +491,7 @@ Pureflow is engineered for maximum performance:
 | **Pooled Nodes** | Reduced GC pressure |
 | **Batch Updates** | Minimize notification overhead |
 
-In benchmarks, Pureflow outperforms popular packages almost across all operations. See [BENCHMARK_README.md](benchmark/BENCHMARK_README.md) for detailed performance comparisons.
+In benchmarks, Pureflow outperforms popular packages almost across all operations. See [BENCHMARK_README.md](benchmark/README.md) for detailed performance comparisons.
 
 ---
 
