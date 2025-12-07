@@ -246,3 +246,4 @@ pubspec.lock
 
 # FVM Version Cache
 .fvm/
+!benchmark/bin/
