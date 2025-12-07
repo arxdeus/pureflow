@@ -344,22 +344,20 @@ dependencies:
 The `asListenable` extension converts any `Store` or `Computed` to a Flutter `ValueListenable`:
 
 ```dart
-import 'package:pureflow/pureflow.dart';
-import 'package:pureflow_flutter/pureflow_flutter.dart';
+// From any stateful piece of your code
+final counter = Store<int>(0);
 
-class CounterPage extends StatelessWidget {
-  final counter = Store<int>(0);
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: counter.asListenable,
-      builder: (context, value, child) {
-        return Text('Count: $value');
-      },
-    );
-  }
+// Inside of any widget `build` method
+@override
+Widget build(BuildContext context) {
+  return ValueListenableBuilder<int>(
+    valueListenable: counter.asListenable,
+    builder: (context, value, child) {
+      return Text('Count: $value');
+    },
+  );
 }
+
 ```
 
 ### Usage with AnimatedBuilder
