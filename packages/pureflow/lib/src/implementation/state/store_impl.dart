@@ -54,6 +54,10 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
       return;
     }
 
+    // Fast path: skip notification if no listeners or dependencies
+    if (!hasListeners) {
+      return;
+    }
     // Notify all subscribers (listeners + dependencies)
     notifySubscribers();
   }
