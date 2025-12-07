@@ -175,7 +175,7 @@ class BlocSequentialBenchmark extends AsyncBenchmarkBase {
   }
 
   @override
-  Future<void> exercise() async {
+  Future<void> run() async {
     final value = Random().nextInt(100);
     bloc.add(value);
     await Future<void>.delayed(Duration.zero);
