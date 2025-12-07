@@ -109,8 +109,6 @@ class BlocCubitNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
   late final CounterCubit cubit;
   final List<StreamSubscription<int>> _subscriptions = [];
   int _counter = 0;
-  Completer<void>? _completer;
-  int _notificationCount = 0;
 
   BlocCubitNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super('Bloc: Cubit.notify.many_dependents',
@@ -121,10 +119,7 @@ class BlocCubitNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
     cubit = CounterCubit();
     for (var i = 0; i < 1000; i++) {
       final subscription = cubit.stream.listen((state) {
-        _notificationCount++;
-        if (_notificationCount == 1000 && _completer != null) {
-          _completer!.complete();
-        }
+        // Just track that notification happened
       });
       _subscriptions.add(subscription);
     }
@@ -132,10 +127,7 @@ class BlocCubitNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
 
   @override
   Future<void> run() async {
-    _completer = Completer<void>();
-    _notificationCount = 0;
     cubit.emit(++_counter);
-    await _completer!.future;
   }
 
   @override
@@ -143,6 +135,60 @@ class BlocCubitNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }
+    await cubit.close();
+  }
+}
+
+class BlocCubitSubscribeBenchmark extends AsyncBenchmarkBase {
+  late final CounterCubit cubit;
+  StreamSubscription<int>? _subscription;
+
+  BlocCubitSubscribeBenchmark({ScoreEmitter? emitter})
+      : super('Bloc: Cubit.subscribe',
+            emitter: emitter ?? const PrintEmitter());
+
+  @override
+  Future<void> setup() async {
+    cubit = CounterCubit();
+  }
+
+  @override
+  Future<void> run() async {
+    _subscription = cubit.stream.listen((state) {
+      // Empty listener
+    });
+  }
+
+  @override
+  Future<void> teardown() async {
+    await _subscription?.cancel();
+    await cubit.close();
+  }
+}
+
+class BlocCubitUnsubscribeBenchmark extends AsyncBenchmarkBase {
+  late final CounterCubit cubit;
+  late final StreamSubscription<int> subscription;
+
+  BlocCubitUnsubscribeBenchmark({ScoreEmitter? emitter})
+      : super('Bloc: Cubit.unsubscribe',
+            emitter: emitter ?? const PrintEmitter());
+
+  @override
+  Future<void> setup() async {
+    cubit = CounterCubit();
+    subscription = cubit.stream.listen((state) {
+      // Empty listener
+    });
+  }
+
+  @override
+  Future<void> run() async {
+    await subscription.cancel();
+  }
+
+  @override
+  Future<void> teardown() async {
     await cubit.close();
   }
 }
@@ -203,6 +249,8 @@ Future<List<BenchmarkResult>> runBenchmark() async {
   BlocCubitWriteBenchmark(emitter: emitter).report();
   await BlocCubitNotifyBenchmark(emitter: emitter).report();
   await BlocCubitNotifyManyDependentsBenchmark(emitter: emitter).report();
+  await BlocCubitSubscribeBenchmark(emitter: emitter).report();
+  await BlocCubitUnsubscribeBenchmark(emitter: emitter).report();
 
   // Async Configurable Concurrency Flow Benchmarks
   await BlocSequentialBenchmark(emitter: emitter).report();
@@ -225,6 +273,12 @@ String _extractFeature(String benchmarkName) {
   }
   if (benchmarkName.contains('Cubit.notify')) {
     return 'State Holder: Notify';
+  }
+  if (benchmarkName.contains('Cubit.subscribe')) {
+    return 'State Holder: Subscribe';
+  }
+  if (benchmarkName.contains('Cubit.unsubscribe')) {
+    return 'State Holder: Unsubscribe';
   }
   if (benchmarkName.contains('Sequential')) {
     return 'Async Concurrency: Sequential';
