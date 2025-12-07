@@ -9,13 +9,10 @@ environment:
 
 dev_dependencies:
   meta: ^1.14.0
-  signals_core: ^6.2.0
-
   test: any
   pureflow: any
-  benchmark_harness: any
-
 
 workspace:
 - packages/pureflow
 - packages/pureflow_flutter
+- benchmark
