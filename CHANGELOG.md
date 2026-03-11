@@ -1,6 +1,17 @@
 # Changelog
 
 ---
+## [1.0.2]
+
+### Bug Fixes
+
+- `ReactiveValueObservable` to exports - ([53a3c61](https://github.com/arxdeus/pureflow/commit/53a3c61064f7d8ce3ca7fe0512db2de667303294))
+
+### Performance
+
+- **(store_impl)** optimize notification logic to skip unnecessary notifications when there are no listeners - ([ee2ee43](https://github.com/arxdeus/pureflow/commit/ee2ee4365d4a78832e6cbd93bd429e047f457fe5))
+
+---
 ## [1.0.1]
 
 ### Bug Fixes
