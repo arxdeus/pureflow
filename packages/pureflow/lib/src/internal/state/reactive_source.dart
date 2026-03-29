@@ -71,6 +71,7 @@ abstract class ReactiveSource<T> extends Stream<T>
     }
   }
 
+  @override
   @pragma('vm:prefer-inline')
   void removeListenerNode(ListenerNode node) {
     final prev = node.prev;

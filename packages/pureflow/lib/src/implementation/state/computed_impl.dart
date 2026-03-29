@@ -17,7 +17,7 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 @internal
 class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   ComputedImpl(this._compute, {bool Function(T, T)? equality})
-      : _equals = equality ?? ((T a, T b) => identical(a, b) || a == b);
+      : _equals = equality ?? defaultEquals;
 
   final T Function() _compute;
   final bool Function(T, T) _equals;

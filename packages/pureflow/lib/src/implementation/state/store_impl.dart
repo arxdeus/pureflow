@@ -12,7 +12,7 @@ import 'package:pureflow/src/store.dart';
 @internal
 class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   StoreImpl(this._value, {bool Function(T, T)? equality})
-      : _equals = equality ?? ((T a, T b) => identical(a, b) || a == b);
+      : _equals = equality ?? defaultEquals;
 
   T _value;
   bool inBatch = false;
