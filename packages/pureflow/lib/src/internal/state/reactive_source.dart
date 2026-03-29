@@ -51,13 +51,14 @@ abstract class ReactiveSource<T> extends Stream<T>
 
   @override
   @pragma('vm:prefer-inline')
-  void addListener(VoidCallback listener) {
+  ListenerNode addListener(VoidCallback listener) {
     final node = ListenerNode(listener);
     node.next = listeners;
     if (listeners != null) {
       listeners!.prev = node;
     }
     listeners = node;
+    return node;
   }
 
   @override

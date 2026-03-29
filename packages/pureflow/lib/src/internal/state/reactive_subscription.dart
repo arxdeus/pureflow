@@ -5,14 +5,15 @@ import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/common/synchronous_future.dart';
 import 'package:pureflow/src/interfaces.dart';
 import 'package:pureflow/src/internal/state/globals.dart';
+import 'package:pureflow/src/internal/state/listener_node.dart';
 
 /// Interface for reactive sources used by ReactiveSubscription.
 @internal
 abstract interface class ReactiveSourceLike<T> {
   T get value;
   int get status;
-  void addListener(VoidCallback listener);
-  void removeListener(VoidCallback listener);
+  ListenerNode addListener(VoidCallback listener);
+  void removeListenerNode(ListenerNode node);
 }
 
 // ============================================================================
@@ -35,19 +36,18 @@ class ReactiveSubscription<T> implements StreamSubscription<T> {
       return;
     }
 
-    _listener = () {
+    _listenerNode = _source.addListener(() {
       if (!_isCanceled && _onData != null && !_isPaused) {
         _onData!(_source.value);
       }
-    };
-    _source.addListener(_listener);
+    });
   }
 
   final ReactiveSourceLike<T> _source;
   void Function(T)? _onData;
   void Function()? _onDone;
 
-  late final VoidCallback _listener;
+  late final ListenerNode _listenerNode;
   bool _isCanceled = false;
   bool _isPaused = false;
 
@@ -64,7 +64,7 @@ class ReactiveSubscription<T> implements StreamSubscription<T> {
   Future<void> cancel() {
     if (!_isCanceled) {
       _isCanceled = true;
-      _source.removeListener(_listener);
+      _source.removeListenerNode(_listenerNode);
       _onDone?.call();
     }
     return const SynchronousFuture<void>(null);
