@@ -152,9 +152,6 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
         if (node.nextSource != null) {
           node.nextSource!.prevSource = prevNode;
         }
-
-        // Return node to pool for reuse
-        releaseNode(node);
       } else {
         headNode = node;
       }

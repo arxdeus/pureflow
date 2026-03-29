@@ -30,23 +30,3 @@ class DependencyNode {
 
   DependencyNode({required this.source, required this.target});
 }
-
-// ============================================================================
-// Node Allocation Functions
-// ============================================================================
-
-/// Allocates a new DependencyNode.
-/// Dart VM's bump-pointer new-space allocator is faster than pooling.
-@internal
-@pragma('vm:prefer-inline')
-DependencyNode acquireNode(
-  ReactiveSource<Object?> source,
-  ReactiveSource<Object?> target,
-) {
-  return DependencyNode(source: source, target: target);
-}
-
-/// No-op. Dart VM's bump-pointer new-space allocator is faster than pooling.
-@internal
-@pragma('vm:prefer-inline')
-void releaseNode(DependencyNode node) {}

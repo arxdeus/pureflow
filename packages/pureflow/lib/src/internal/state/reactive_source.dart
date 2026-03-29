@@ -159,7 +159,7 @@ abstract class ReactiveSource<T> extends Stream<T>
     DependencyNode? oldNode,
   ) {
     // New dependency - acquire node from pool and link to target's source list
-    final node = acquireNode(this, targetView)
+    final node = DependencyNode(source: this, target: targetView)
       ..prevSource = targetView.sourceDeps
       ..rollback = oldNode;
 
