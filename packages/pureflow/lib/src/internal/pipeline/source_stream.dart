@@ -78,11 +78,7 @@ class SourceStreamSubscription implements StreamSubscription<dynamic> {
     // If queue is empty, wait for new events
     if (taskStream.eventQueue.isEmpty) {
       final completer = taskStream.waitingCompleter ??= Completer<void>.sync();
-      completer.future.then((_) {
-        if (!_statusFlag.hasFlag(srcCanceledBit)) {
-          _scheduleNext();
-        }
-      });
+      completer.future.then(_onWaitingCompleted);
       return;
     }
 
@@ -92,6 +88,12 @@ class SourceStreamSubscription implements StreamSubscription<dynamic> {
     _onData?.call(event);
     // Schedule next event processing
     _scheduleNext();
+  }
+
+  void _onWaitingCompleted(void _) {
+    if (!_statusFlag.hasFlag(srcCanceledBit)) {
+      _scheduleNext();
+    }
   }
 
   @pragma('vm:prefer-inline')
