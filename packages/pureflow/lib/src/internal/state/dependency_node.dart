@@ -2,14 +2,6 @@ import 'package:meta/meta.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 
 // ============================================================================
-// Object Pool for DependencyNode
-// ============================================================================
-
-/// Object pool for DependencyNode to reduce allocations.
-@internal
-DependencyNode? nodePool;
-
-// ============================================================================
 // Dependency Node (Optimized for reactive tracking only)
 // ============================================================================
 
@@ -40,37 +32,21 @@ class DependencyNode {
 }
 
 // ============================================================================
-// Object Pool Functions
+// Node Allocation Functions
 // ============================================================================
 
-/// Acquires a node from the pool or creates a new one.
+/// Allocates a new DependencyNode.
+/// Dart VM's bump-pointer new-space allocator is faster than pooling.
 @internal
 @pragma('vm:prefer-inline')
 DependencyNode acquireNode(
   ReactiveSource<Object?> source,
   ReactiveSource<Object?> target,
 ) {
-  final pooled = nodePool;
-  if (pooled != null) {
-    nodePool = pooled.next;
-    pooled
-      ..source = source
-      ..target = target
-      ..isActive = true
-      ..prev = null
-      ..next = null
-      ..prevSource = null
-      ..nextSource = null
-      ..rollback = null;
-    return pooled;
-  }
   return DependencyNode(source: source, target: target);
 }
 
-/// Returns a node to the pool for reuse.
+/// No-op. Dart VM's bump-pointer new-space allocator is faster than pooling.
 @internal
 @pragma('vm:prefer-inline')
-void releaseNode(DependencyNode node) {
-  node.next = nodePool;
-  nodePool = node;
-}
+void releaseNode(DependencyNode node) {}
