@@ -69,7 +69,6 @@ R batch<R>(R Function() action) {
   }
 }
 
-@pragma('vm:prefer-inline')
 void _flushBatch() {
   final count = batchCount;
   if (count == 0) return;

@@ -251,7 +251,6 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     return request.completer.future;
   }
 
-  @pragma('vm:prefer-inline')
   void _completeAsFutureWithSuccess() {
     final statusFlag = _statusFlag;
     if (statusFlag.hasFlag(asFutureCompletedBit)) return;
@@ -267,7 +266,6 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     requests.clear();
   }
 
-  @pragma('vm:prefer-inline')
   void _completeAsFutureWithError(Object error, StackTrace stackTrace) {
     final statusFlag = _statusFlag;
     if (statusFlag.hasFlag(asFutureCompletedBit)) return;

@@ -113,7 +113,6 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   }
 
   /// Mark all dependency nodes as recyclable.
-  @pragma('vm:prefer-inline')
   void _prepareDependencies() {
     for (var node = sourceDeps; node != null; node = node.nextSource) {
       final source = node.source;

@@ -178,7 +178,6 @@ abstract class ReactiveSource<T> extends Stream<T>
   // --------------------------------------------------------------------------
 
   /// Notifies all subscribers (both listeners and dependencies).
-  @pragma('vm:prefer-inline')
   void notifySubscribers() {
     // Guard against recursive notification (inline bit check)
     if (status.hasFlag(notifyingBit)) return;
