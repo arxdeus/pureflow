@@ -5,9 +5,13 @@ import 'package:pureflow/src/internal/state/globals.dart';
 /// Current batch depth for batched updates.
 int batchDepth = 0;
 
-/// Pre-allocated batch buffer for better performance.
-final List<StoreImpl<Object?>?> batchBuffer =
-    List.filled(64, null, growable: true);
+/// Initial batch buffer capacity.
+const int _initialBatchCapacity = 64;
+
+/// Pre-allocated batch buffer.
+/// Non-final to allow replacement when shrinking after large batches.
+List<StoreImpl<Object?>?> batchBuffer =
+    List.filled(_initialBatchCapacity, null, growable: true);
 int batchCount = 0;
 
 /// Runs a function within a batch context, deferring all notifications.
@@ -70,16 +74,37 @@ R batch<R>(R Function() action) {
 }
 
 void _flushBatch() {
-  final count = batchCount;
-  if (count == 0) return;
+  // Temporarily increment batchDepth to prevent re-entrant flush.
+  // Any batch() call from a listener during notification will see
+  // batchDepth > 0, add items to buffer (after current range),
+  // and NOT trigger recursive _flushBatch(). The while loop below
+  // picks up these new items automatically.
+  batchDepth++;
 
-  for (var i = 0; i < count; i++) {
-    final store = batchBuffer[i]!;
-    store.inBatch = false;
-    if (!store.status.hasFlag(disposedBit)) {
-      store.notifySubscribers();
+  var start = 0;
+  while (start < batchCount) {
+    final end = batchCount;
+
+    for (var i = start; i < end; i++) {
+      final store = batchBuffer[i]!;
+      batchBuffer[i] = null;
+      store.inBatch = false;
+      if (!store.status.hasFlag(disposedBit)) {
+        store.notifySubscribers();
+      }
     }
-    batchBuffer[i] = null; // Avoid memory leak
+
+    start = end;
   }
+
   batchCount = 0;
+  batchDepth--;
+
+  // Shrink buffer if it grew beyond 4x initial (256+) and this flush
+  // used less than 25% of capacity. Replace entire buffer because
+  // Dart VM's _GrowableList doesn't release backing array on .length reduction.
+  final bufferLength = batchBuffer.length;
+  if (bufferLength > _initialBatchCapacity * 4 && start < bufferLength ~/ 4) {
+    batchBuffer = List.filled(_initialBatchCapacity, null, growable: true);
+  }
 }
