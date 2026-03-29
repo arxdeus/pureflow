@@ -23,9 +23,8 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   final T Function() _compute;
   final bool Function(T, T)? _equality;
   late T _value;
-  bool _hasValue = false; // Track if we have a computed value
 
-  /// Status flags: bit 0 = dirty, bit 1 = running, bit 2 = disposed
+  /// Status flags: bit 0 = dirty, bit 1 = running, bit 2 = disposed, bit 3 = hasValue
   int _viewStatus = dirtyBit; // Start dirty
 
   @override
@@ -97,17 +96,15 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     }
 
     // Check equality: if values are equal, don't notify subscribers
-    // On first computation (_hasValue is false), always notify
+    // On first computation (hasValueBit not set), always notify
     // Optimized inline equality check
     final shouldNotify =
-        !_hasValue || !checkEquality(_value, newValue, _equality);
+        !_viewStatus.hasFlag(hasValueBit) || !checkEquality(_value, newValue, _equality);
 
     // Only notify if value actually changed
     if (shouldNotify) {
-      if (!_hasValue) _hasValue = true;
-
+      _viewStatus = _viewStatus.setFlag(hasValueBit);
       _value = newValue;
-
       notifySubscribers();
     }
   }

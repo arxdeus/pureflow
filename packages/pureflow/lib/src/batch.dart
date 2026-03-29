@@ -88,7 +88,7 @@ void _flushBatch() {
     for (var i = start; i < end; i++) {
       final store = batchBuffer[i]!;
       batchBuffer[i] = null;
-      store.inBatch = false;
+      store.status = store.status.clearFlag(inBatchBit);
       if (!store.status.hasFlag(disposedBit)) {
         store.notifySubscribers();
       }

@@ -16,7 +16,6 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
       : _equality = equality;
 
   T _value;
-  bool inBatch = false;
   final bool Function(T, T)? _equality;
 
   @override
@@ -43,8 +42,8 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
 
     // Handle batching - defer notification
     if (batchDepth > 0) {
-      if (!inBatch) {
-        inBatch = true;
+      if (!status.hasFlag(inBatchBit)) {
+        status = status.setFlag(inBatchBit);
         // Use pre-allocated buffer, grow if needed
         if (batchCount >= batchBuffer.length) {
           batchBuffer.length *= 2;
