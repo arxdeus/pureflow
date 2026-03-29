@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/common/equality.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 
@@ -18,10 +17,10 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 @internal
 class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   ComputedImpl(this._compute, {bool Function(T, T)? equality})
-      : _equality = equality;
+      : _equals = equality ?? ((T a, T b) => identical(a, b) || a == b);
 
   final T Function() _compute;
-  final bool Function(T, T)? _equality;
+  final bool Function(T, T) _equals;
   late T _value;
 
   /// Status flags: bit 0 = dirty, bit 1 = running, bit 2 = disposed, bit 3 = hasValue
@@ -95,11 +94,8 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
       _viewStatus = _viewStatus.clearFlag(dirtyBit | runningBit);
     }
 
-    // Check equality: if values are equal, don't notify subscribers
-    // On first computation (hasValueBit not set), always notify
-    // Optimized inline equality check
     final shouldNotify =
-        !_viewStatus.hasFlag(hasValueBit) || !checkEquality(_value, newValue, _equality);
+        !_viewStatus.hasFlag(hasValueBit) || !_equals(_value, newValue);
 
     // Only notify if value actually changed
     if (shouldNotify) {

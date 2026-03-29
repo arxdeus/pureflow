@@ -1,7 +1,6 @@
 import 'package:meta/meta.dart';
 import 'package:pureflow/src/batch.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/common/equality.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 import 'package:pureflow/src/store.dart';
 
@@ -13,10 +12,11 @@ import 'package:pureflow/src/store.dart';
 @internal
 class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   StoreImpl(this._value, {bool Function(T, T)? equality})
-      : _equality = equality;
+      : _equals = equality ?? ((T a, T b) => identical(a, b) || a == b);
 
   T _value;
-  final bool Function(T, T)? _equality;
+  bool inBatch = false;
+  final bool Function(T, T) _equals;
 
   @override
   @pragma('vm:prefer-inline')
@@ -35,8 +35,7 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
     // Disposed check first (cheap bit operation)
     if (status.hasFlag(disposedBit)) return;
 
-    // Optimized inline equality check
-    if (checkEquality(_value, newValue, _equality)) return;
+    if (_equals(_value, newValue)) return;
 
     _value = newValue;
 
