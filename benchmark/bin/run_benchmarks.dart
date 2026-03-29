@@ -11,10 +11,6 @@ import 'package:benchmark/impls/signals_core_benchmarks.dart' as signals;
 void main(List<String> args) async {
   print('Running all benchmarks...\n');
 
-  print('Running bloc_benchmarks.dart...');
-  final blocResults = await bloc.runBenchmark();
-  print('  ✓ Completed (${blocResults.length} benchmarks)\n');
-
   // Run Pureflow benchmarks first (baseline)
   print('Running pureflow_benchmarks.dart...');
   final pureflowResults = await pureflow.runBenchmark();
@@ -36,6 +32,10 @@ void main(List<String> args) async {
   print('Running mobx_benchmarks.dart...');
   final mobxResults = await mobx.runBenchmark();
   print('  ✓ Completed (${mobxResults.length} benchmarks)\n');
+
+  print('Running bloc_benchmarks.dart...');
+  final blocResults = await bloc.runBenchmark();
+  print('  ✓ Completed (${blocResults.length} benchmarks)\n');
 
   // Combine all results
   final allResults = <BenchmarkResult>[];

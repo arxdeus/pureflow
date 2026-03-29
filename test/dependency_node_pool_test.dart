@@ -19,7 +19,7 @@ void main() {
     });
 
     test('large dependency graph works', () {
-      final stores = List.generate(200, (i) => Store<int>(i));
+      final stores = List.generate(200, Store<int>.new);
       final computed = Computed(() {
         var sum = 0;
         for (final s in stores) { sum += s.value; }

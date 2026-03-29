@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 void main() {
   group('Batch buffer', () {
     test('large batch works', () {
-      final stores = List.generate(200, (i) => Store<int>(i));
+      final stores = List.generate(200, Store<int>.new);
       var n = 0;
       for (final s in stores) {
         s.addListener(() => n++);
@@ -21,7 +21,7 @@ void main() {
     });
 
     test('small batch after large batch works', () {
-      final large = List.generate(200, (i) => Store<int>(i));
+      final large = List.generate(200, Store<int>.new);
       batch(() {
         for (final s in large) {
           s.value = 999;
@@ -31,7 +31,8 @@ void main() {
         s.dispose();
       }
 
-      final a = Store<int>(0), b = Store<int>(0);
+      final a = Store<int>(0);
+      final b = Store<int>(0);
       var c = 0;
       a.addListener(() => c++);
       b.addListener(() => c++);
@@ -45,13 +46,16 @@ void main() {
     });
 
     test('re-entrant batch with single store', () {
-      final a = Store<int>(0), b = Store<int>(0), c = Store<int>(0);
+      final a = Store<int>(0);
+      final b = Store<int>(0);
+      final c = Store<int>(0);
       a.addListener(() {
         batch(() {
           b.value = 100;
         });
       });
-      var bN = false, cN = false;
+      var bN = false;
+      var cN = false;
       b.addListener(() => bN = true);
       c.addListener(() => cN = true);
       batch(() {
@@ -67,10 +71,11 @@ void main() {
     });
 
     test('re-entrant batch with multiple stores', () {
-      final a = Store<int>(0),
-          b = Store<int>(0),
-          c = Store<int>(0);
-      final x = Store<int>(0), y = Store<int>(0);
+      final a = Store<int>(0);
+      final b = Store<int>(0);
+      final c = Store<int>(0);
+      final x = Store<int>(0);
+      final y = Store<int>(0);
       x.addListener(() {});
       y.addListener(() {});
       a.addListener(() {
@@ -98,7 +103,7 @@ void main() {
     });
 
     test('re-entrant batch after large batch', () {
-      final stores = List.generate(300, (i) => Store<int>(i));
+      final stores = List.generate(300, Store<int>.new);
       final trigger = Store<int>(0);
       trigger.addListener(() {
         batch(() {

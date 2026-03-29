@@ -10,6 +10,12 @@ import 'package:riverpod/riverpod.dart' as rp;
 // State Holder Benchmarks
 // ============================================================================
 
+/// Measures the cost of creating and initializing a StateProvider.
+/// Riverpod requires a ProviderContainer for any provider usage, and a single
+/// container accumulates unbounded state across iterations (causing hangs).
+/// Therefore the full container lifecycle (create → read → dispose) is
+/// measured per iteration. This reflects the real minimum cost of getting
+/// a usable state holder in Riverpod.
 class RiverpodStateProviderCreateBenchmark extends BenchmarkBase {
   RiverpodStateProviderCreateBenchmark({ScoreEmitter? emitter})
       : super('Riverpod: StateProvider.create',
@@ -24,6 +30,9 @@ class RiverpodStateProviderCreateBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: Riverpod reads go through `container.read()` which involves a map
+/// lookup by provider identity, unlike other libraries that use direct field
+/// access. This indirection is inherent to Riverpod's architecture.
 class RiverpodStateProviderReadBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
   late final rp.StateProvider<int> provider;
@@ -50,6 +59,9 @@ class RiverpodStateProviderReadBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: Riverpod writes go through `container.read(provider.notifier).state =`
+/// which is two indirections (container lookup + notifier access) vs a direct
+/// assignment in other libraries.
 class RiverpodStateProviderWriteBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
   late final rp.StateProvider<int> provider;
@@ -80,7 +92,7 @@ class RiverpodStateProviderNotifyBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
   late final rp.StateProvider<int> provider;
   int _counter = 0;
-  int _notifications = 0;
+  int _lastValue = 0;
   late final rp.ProviderSubscription<int> subscription;
 
   RiverpodStateProviderNotifyBenchmark({ScoreEmitter? emitter})
@@ -92,7 +104,7 @@ class RiverpodStateProviderNotifyBenchmark extends BenchmarkBase {
     container = rp.ProviderContainer();
     provider = rp.StateProvider<int>((ref) => 0);
     subscription = container.listen(provider, (previous, next) {
-      _notifications++;
+      _lastValue = next;
     });
   }
 
@@ -124,7 +136,7 @@ class RiverpodStateProviderNotifyManyDependentsBenchmark extends BenchmarkBase {
     provider = rp.StateProvider<int>((ref) => 0);
     for (var i = 0; i < 1000; i++) {
       final subscription = container.listen(provider, (previous, next) {
-        // Just track that notification happened
+        final _ = next;
       });
       _subscriptions.add(subscription);
     }
@@ -148,30 +160,24 @@ class RiverpodStateProviderNotifyManyDependentsBenchmark extends BenchmarkBase {
 // Recomputable View Benchmarks
 // ============================================================================
 
+/// Measures the cost of creating a computed (derived) provider.
+/// Riverpod requires a ProviderContainer + base provider for any computed.
+/// A single container accumulates unbounded dependents across iterations
+/// (causing hangs), so the full lifecycle is measured per iteration.
+/// This reflects the real minimum cost of getting a usable computed in
+/// Riverpod.
 class RiverpodComputedCreateBenchmark extends BenchmarkBase {
-  late final rp.ProviderContainer container;
-  late final rp.Provider<int> baseProvider;
-  late final rp.Provider<int> computedProvider;
-
   RiverpodComputedCreateBenchmark({ScoreEmitter? emitter})
       : super('Riverpod: Computed.create',
             emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
-    container = rp.ProviderContainer();
-    baseProvider = rp.Provider<int>((ref) => 42);
-    computedProvider = rp.Provider<int>((ref) => ref.watch(baseProvider) * 2);
-  }
-
-  @override
   void run() {
-    // Just read the provider to trigger creation
+    final container = rp.ProviderContainer();
+    final baseProvider = rp.StateProvider<int>((ref) => 42);
+    final computedProvider =
+        rp.Provider<int>((ref) => ref.watch(baseProvider) * 2);
     container.read(computedProvider);
-  }
-
-  @override
-  void teardown() {
     container.dispose();
   }
 }

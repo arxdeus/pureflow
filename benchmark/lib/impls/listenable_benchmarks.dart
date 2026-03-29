@@ -11,14 +11,23 @@ import 'package:benchmark_harness/benchmark_harness.dart';
 // ============================================================================
 
 class ListenableValueNotifierCreateBenchmark extends BenchmarkBase {
+  final List<ValueNotifier<int>> _notifiers = [];
+
   ListenableValueNotifierCreateBenchmark({ScoreEmitter? emitter})
       : super('ValueNotifier: ValueNotifier.create',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    final notifier = ValueNotifier<int>(42);
-    notifier.dispose();
+    _notifiers.add(ValueNotifier<int>(42));
+  }
+
+  @override
+  void teardown() {
+    for (final notifier in _notifiers) {
+      notifier.dispose();
+    }
+    _notifiers.clear();
   }
 }
 
@@ -73,7 +82,7 @@ class ListenableValueNotifierWriteBenchmark extends BenchmarkBase {
 class ListenableValueNotifierNotifyBenchmark extends BenchmarkBase {
   late final ValueNotifier<int> notifier;
   int _counter = 0;
-  int _notifications = 0;
+  int _lastValue = 0;
   late final VoidCallback listener;
 
   ListenableValueNotifierNotifyBenchmark({ScoreEmitter? emitter})
@@ -84,7 +93,7 @@ class ListenableValueNotifierNotifyBenchmark extends BenchmarkBase {
   void setup() {
     notifier = ValueNotifier<int>(0);
     listener = () {
-      _notifications++;
+      _lastValue = notifier.value;
     };
     notifier.addListener(listener);
   }
@@ -116,7 +125,7 @@ class ListenableValueNotifierNotifyManyDependentsBenchmark
     notifier = ValueNotifier<int>(0);
     for (var i = 0; i < 1000; i++) {
       void listener() {
-        // Just track that notification happened
+        final _ = notifier.value;
       }
       notifier.addListener(listener);
       _listeners.add(listener);
@@ -174,6 +183,7 @@ class ComputedValueNotifier<T> extends ValueNotifier<T> {
 
 class ListenableComputedCreateBenchmark extends BenchmarkBase {
   late final ValueNotifier<int> base;
+  final List<ComputedValueNotifier<int>> _computeds = [];
 
   ListenableComputedCreateBenchmark({ScoreEmitter? emitter})
       : super('ValueNotifier: Computed.create',
@@ -186,16 +196,21 @@ class ListenableComputedCreateBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    final computed = ComputedValueNotifier<int>(
+    _computeds.add(ComputedValueNotifier<int>(
       () => base.value * 2,
       [base],
-    );
-    computed.dispose();
+    ));
   }
 
   @override
   void teardown() {
+    // Dispose base first — this clears its internal listener list in O(1).
+    // Individual computed.dispose() would call base.removeListener() which
+    // is O(n) per call (linear scan + array shift in ChangeNotifier).
+    // With 100K+ computeds accumulated during measurement, individual
+    // disposal would be O(n²) — i.e. hang for hours.
     base.dispose();
+    _computeds.clear();
   }
 }
 
@@ -229,6 +244,10 @@ class ListenableComputedReadBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: ComputedValueNotifier recomputes eagerly on write (via addListener
+/// callback), unlike Pureflow/Signals/MobX which mark dirty and recompute
+/// lazily on read. The `computed.value` read here returns an already-cached
+/// result.
 class ListenableComputedRecomputeBenchmark extends BenchmarkBase {
   late final ValueNotifier<int> base;
   late final ComputedValueNotifier<int> computed;
@@ -261,6 +280,10 @@ class ListenableComputedRecomputeBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: Eager propagation — when `base.value` changes, `doubled._recompute()`
+/// fires synchronously, then `sum._recompute()` fires because `doubled`
+/// notified its listeners. By the time `sum.value` is read, the full chain
+/// has already propagated. Other libraries propagate lazily on read.
 class ListenableComputedChainBenchmark extends BenchmarkBase {
   late final ValueNotifier<int> base;
   late final ComputedValueNotifier<int> doubled;
@@ -299,6 +322,9 @@ class ListenableComputedChainBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: All 1000 ComputedValueNotifiers recompute eagerly on `base.value =`
+/// write. The subsequent read loop accesses already-cached values. Other
+/// libraries mark dirty on write and lazily recompute on read.
 class ListenableComputedChainManyDependentsBenchmark extends BenchmarkBase {
   late final ValueNotifier<int> base;
   final List<ComputedValueNotifier<int>> _computeds = [];

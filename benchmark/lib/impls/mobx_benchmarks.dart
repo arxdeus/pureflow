@@ -11,14 +11,21 @@ import 'package:mobx/mobx.dart';
 // ============================================================================
 
 class MobxObservableCreateBenchmark extends BenchmarkBase {
+  final List<Observable<int>> _observables = [];
+
   MobxObservableCreateBenchmark({ScoreEmitter? emitter})
       : super('MobX: Observable.create',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    Observable(42);
-    // MobX Observable doesn't have explicit dispose, but we can clear reactions
+    _observables.add(Observable(42));
+  }
+
+  @override
+  void teardown() {
+    // MobX Observable has no explicit disposal API; clear to release references.
+    _observables.clear();
   }
 }
 
@@ -46,6 +53,9 @@ class MobxObservableReadBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: MobX architecturally requires `runInAction()` for writes.
+/// This adds closure allocation + transaction overhead per write that
+/// other libraries don't have. The overhead is inherent to MobX's design.
 class MobxObservableWriteBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
   int _counter = 0;
@@ -68,10 +78,14 @@ class MobxObservableWriteBenchmark extends BenchmarkBase {
 
   @override
   void teardown() {
-    // MobX Observable doesn't need explicit disposal
+    // MobX Observable has no explicit disposal API.
   }
 }
 
+/// Note: MobX `reaction()` uses a selector function `(_) => observable.value`
+/// that runs first to determine if the effect should fire — 2 function calls
+/// per notification vs 1 for plain addListener callbacks.
+/// Additionally, `runInAction()` wraps every write (see Write benchmark).
 class MobxObservableNotifyBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
   int _counter = 0;
@@ -85,8 +99,8 @@ class MobxObservableNotifyBenchmark extends BenchmarkBase {
   @override
   void setup() {
     observable = Observable(0);
-    disposer = reaction((_) => observable.value, (_) {
-      _notifications++;
+    disposer = reaction((_) => observable.value, (int value) {
+      _notifications = value;
     });
   }
 
@@ -103,6 +117,8 @@ class MobxObservableNotifyBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: Same `reaction()` + `runInAction()` overhead as Notify, multiplied
+/// by 1000 dependents.
 class MobxObservableNotifyManyDependentsBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
   final List<ReactionDisposer> _disposers = [];
@@ -116,8 +132,8 @@ class MobxObservableNotifyManyDependentsBenchmark extends BenchmarkBase {
   void setup() {
     observable = Observable(0);
     for (var i = 0; i < 1000; i++) {
-      final disposer = reaction((_) => observable.value, (_) {
-        // Just track that notification happened
+      final disposer = reaction((_) => observable.value, (int value) {
+        final _ = value;
       });
       _disposers.add(disposer);
     }
@@ -144,6 +160,7 @@ class MobxObservableNotifyManyDependentsBenchmark extends BenchmarkBase {
 
 class MobxComputedCreateBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
+  final List<Computed<int>> _computeds = [];
 
   MobxComputedCreateBenchmark({ScoreEmitter? emitter})
       : super('MobX: Computed.create',
@@ -156,13 +173,13 @@ class MobxComputedCreateBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    Computed(() => observable.value * 2);
-    // MobX Computed doesn't need explicit disposal
+    _computeds.add(Computed(() => observable.value * 2));
   }
 
   @override
   void teardown() {
-    // MobX Observable doesn't need explicit disposal
+    // MobX has no explicit disposal API; clear to release references.
+    _computeds.clear();
   }
 }
 
@@ -191,6 +208,8 @@ class MobxComputedReadBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: `runInAction()` wraps the write (closure allocation + transaction
+/// overhead). The read triggers lazy recomputation with dirty-flag check.
 class MobxComputedRecomputeBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
   late final Computed<int> computed;
@@ -221,6 +240,8 @@ class MobxComputedRecomputeBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: `runInAction()` wraps the write. Chain propagation is lazy — each
+/// Computed checks its dirty flag on read.
 class MobxComputedChainBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
   late final Computed<int> doubled;
@@ -252,6 +273,8 @@ class MobxComputedChainBenchmark extends BenchmarkBase {
   }
 }
 
+/// Note: `runInAction()` wraps the write, then 1000 Computed values are
+/// read, each checking its dirty flag and lazily recomputing.
 class MobxComputedChainManyDependentsBenchmark extends BenchmarkBase {
   late final Observable<int> observable;
   final List<Computed<int>> _computeds = [];

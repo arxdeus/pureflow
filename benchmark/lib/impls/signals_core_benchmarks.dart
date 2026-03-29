@@ -11,14 +11,23 @@ import 'package:signals_core/signals_core.dart' as sig;
 // ============================================================================
 
 class SignalsCoreStoreCreateBenchmark extends BenchmarkBase {
+  final List<sig.Signal<int>> _signals = [];
+
   SignalsCoreStoreCreateBenchmark({ScoreEmitter? emitter})
       : super('Signals: Signal.create',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    final s = sig.signal(42);
-    s.dispose();
+    _signals.add(sig.signal(42));
+  }
+
+  @override
+  void teardown() {
+    for (final s in _signals) {
+      s.dispose();
+    }
+    _signals.clear();
   }
 }
 
@@ -140,6 +149,7 @@ class SignalsCoreStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
 
 class SignalsCoreComputedCreateBenchmark extends BenchmarkBase {
   late final sig.Signal<int> s;
+  final List<sig.Computed<int>> _computeds = [];
 
   SignalsCoreComputedCreateBenchmark({ScoreEmitter? emitter})
       : super('Signals: Computed.create',
@@ -152,13 +162,15 @@ class SignalsCoreComputedCreateBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    final c = sig.computed(() => s.value * 2);
-    c.dispose();
+    _computeds.add(sig.computed(() => s.value * 2));
   }
 
   @override
   void teardown() {
+    // Dispose signal first to release dependency graph, then clear computeds.
+    // Avoids potentially O(n²) teardown if signal's subscriber removal is O(n).
     s.dispose();
+    _computeds.clear();
   }
 }
 

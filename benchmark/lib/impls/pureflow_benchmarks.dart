@@ -1,7 +1,6 @@
 // ignore_for_file: unused_field, invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 
 import 'dart:async';
-import 'dart:math';
 
 import 'package:benchmark/common/benchmark_result.dart';
 import 'package:benchmark_harness/benchmark_harness.dart';
@@ -13,14 +12,23 @@ import 'package:pureflow/pureflow.dart' as pf;
 // ============================================================================
 
 class PureflowStoreCreateBenchmark extends BenchmarkBase {
+  final List<pf.Store<int>> _stores = [];
+
   PureflowStoreCreateBenchmark({ScoreEmitter? emitter})
       : super('Pureflow: Store.create',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    final store = pf.Store<int>(42);
-    store.dispose();
+    _stores.add(pf.Store<int>(42));
+  }
+
+  @override
+  void teardown() {
+    for (final store in _stores) {
+      store.dispose();
+    }
+    _stores.clear();
   }
 }
 
@@ -74,7 +82,7 @@ class PureflowStoreWriteBenchmark extends BenchmarkBase {
 class PureflowStoreNotifyBenchmark extends BenchmarkBase {
   late final pf.Store<int> store;
   int _counter = 0;
-  int _notifications = 0;
+  int _lastValue = 0;
 
   PureflowStoreNotifyBenchmark({ScoreEmitter? emitter})
       : super('Pureflow: Store.notify',
@@ -84,7 +92,7 @@ class PureflowStoreNotifyBenchmark extends BenchmarkBase {
   void setup() {
     store = pf.Store<int>(0);
     store.addListener(() {
-      _notifications++;
+      _lastValue = store.value;
     });
   }
 
@@ -113,7 +121,7 @@ class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
     store = pf.Store<int>(0);
     for (var i = 0; i < 1000; i++) {
       void listener() {
-        // Just track that notification happened
+        final _ = store.value;
       }
       store.addListener(listener);
       _listeners.add(listener);
@@ -140,6 +148,7 @@ class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
 
 class PureflowComputedCreateBenchmark extends BenchmarkBase {
   late final pf.Store<int> store;
+  final List<pf.Computed<int>> _computeds = [];
 
   PureflowComputedCreateBenchmark({ScoreEmitter? emitter})
       : super('Pureflow: Computed.create',
@@ -152,13 +161,16 @@ class PureflowComputedCreateBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    final computed = pf.Computed(() => store.value * 2);
-    computed.dispose();
+    _computeds.add(pf.Computed(() => store.value * 2));
   }
 
   @override
   void teardown() {
+    // Dispose store first to release dependency graph, then clear computeds.
+    // Pureflow uses linked list (O(1) removal), but disposing the source
+    // first is still faster than individual computed disposal.
     store.dispose();
+    _computeds.clear();
   }
 }
 
@@ -292,6 +304,7 @@ class PureflowComputedChainManyDependentsBenchmark extends BenchmarkBase {
 
 class PureflowPipelineSequentialBenchmark extends AsyncBenchmarkBase {
   late final pf.Pipeline pipeline;
+  int _counter = 0;
 
   PureflowPipelineSequentialBenchmark({ScoreEmitter? emitter})
       : super('Pureflow: Pipeline.sequential',
@@ -299,12 +312,14 @@ class PureflowPipelineSequentialBenchmark extends AsyncBenchmarkBase {
 
   @override
   Future<void> setup() async {
-    pipeline = pf.Pipeline(transformer: concurrent());
+    pipeline = pf.Pipeline(transformer: sequential());
   }
 
   @override
   Future<void> run() async {
-    final value = Random().nextInt(100);
+    // Use monotonic counter for deterministic results, consistent
+    // with Bloc's Sequential benchmark which also uses a counter.
+    final value = ++_counter;
 
     final result = await pipeline.run((context) async {
       await Future<void>.delayed(Duration.zero);
