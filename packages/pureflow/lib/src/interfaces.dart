@@ -147,6 +147,4 @@ abstract class ValueObservable<T> implements Observable {
 ///   builder: (context, snapshot) => Text('Count: ${snapshot.data}'),
 /// );
 /// ```
-abstract class ReactiveValueObservable<T>
-    with Stream<T>
-    implements ValueObservable<T> {}
+abstract class ReactiveValueObservable<T> = ValueObservable<T> with Stream<T>;
