@@ -1052,7 +1052,9 @@ void main() {
     final events = <(String?, FlowKind, Object?, Object?)>[];
     Pureflow.observer = FlowObserver(
       onObservableChanged: (label, kind, oldValue, newValue) {
-        events.add((label, kind, oldValue, newValue));
+        if (kind == FlowKind.computed) {
+          events.add((label, kind, oldValue, newValue));
+        }
       },
     );
     final c = Computed(() => s.value * 2, debugLabel: 'doubled');
