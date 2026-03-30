@@ -11,4 +11,5 @@ export 'src/interfaces.dart'
     show Observable, ReactiveValueObservable, ValueObservable;
 export 'src/pipeline.dart'
     show EventMapper, EventTransformer, Pipeline, PipelineEventContext;
+export 'src/observer.dart' show FlowKind, FlowObserver, Pureflow;
 export 'src/store.dart' show Store;
