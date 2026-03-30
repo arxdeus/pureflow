@@ -70,6 +70,9 @@ import 'package:pureflow/src/interfaces.dart';
 ///
 /// - [T]: The type of value stored in this reactive store.
 abstract class Store<T> implements ReactiveValueObservable<T> {
+  /// An optional label for debugging and observation.
+  String? get debugLabel;
+
   /// Creates a new [Store] with the given initial [value].
   ///
   /// The store is immediately ready for use after construction.
@@ -92,8 +95,8 @@ abstract class Store<T> implements ReactiveValueObservable<T> {
   ///   equality: (a, b) => a.length == b.length && a.every((e) => b.contains(e)),
   /// );
   /// ```
-  factory Store(T value, {bool Function(T, T)? equality}) =>
-      StoreImpl<T>(value, equality: equality);
+  factory Store(T value, {bool Function(T, T)? equality, String? debugLabel}) =>
+      StoreImpl<T>(value, equality: equality, debugLabel: debugLabel);
 
   /// The current value of this store.
   ///

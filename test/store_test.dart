@@ -1,7 +1,9 @@
 import 'package:pureflow/pureflow.dart';
+import 'package:pureflow/pureflow.dart';
 import 'package:test/test.dart';
 
 void main() {
+  addDebugLabelTests();
   // ============================================================================
   // Basic Operations
   // ============================================================================
@@ -1020,3 +1022,158 @@ class _TestObject {
 }
 
 enum _TestEnum { first, second }
+
+// ============================================================================
+// debugLabel and Observer Hooks
+// ============================================================================
+
+void addDebugLabelTests() {
+  group('Store - debugLabel', () {
+    tearDown(() {
+      Pureflow.observer = null;
+    });
+
+    test('debugLabel is null by default', () {
+      final s = Store(42);
+      expect(s.debugLabel, isNull);
+      s.dispose();
+    });
+
+    test('debugLabel is set when provided', () {
+      final s = Store(42, debugLabel: 'counter');
+      expect(s.debugLabel, 'counter');
+      s.dispose();
+    });
+
+    test('toString includes label when set', () {
+      final s = Store(42, debugLabel: 'counter');
+      expect(s.toString(), 'Store<int>[counter](42)');
+      s.dispose();
+    });
+
+    test('toString without label uses default format', () {
+      final s = Store(42);
+      expect(s.toString(), 'Store<int>(42)');
+      s.dispose();
+    });
+
+    test('onCreated fires when observer set and store created', () {
+      final events = <(String?, FlowKind)>[];
+      Pureflow.observer = FlowObserver(
+        onCreated: (label, kind) => events.add((label, kind)),
+      );
+      final s = Store(1, debugLabel: 'myStore');
+      expect(events, [(('myStore', FlowKind.store))]);
+      s.dispose();
+    });
+
+    test('onCreated fires with null label when no debugLabel', () {
+      final events = <(String?, FlowKind)>[];
+      Pureflow.observer = FlowObserver(
+        onCreated: (label, kind) => events.add((label, kind)),
+      );
+      final s = Store(1);
+      expect(events, [((null, FlowKind.store))]);
+      s.dispose();
+    });
+
+    test('onCreated does not fire when observer is null', () {
+      var called = false;
+      Pureflow.observer = null;
+      final s = Store(1, debugLabel: 'x');
+      expect(called, isFalse);
+      s.dispose();
+    });
+
+    test('onObservableChanged fires on value change', () {
+      final events = <(String?, FlowKind, Object?, Object?)>[];
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (label, kind, old, next) =>
+            events.add((label, kind, old, next)),
+      );
+      final s = Store(1, debugLabel: 'counter');
+      s.value = 2;
+      expect(events.length, 1);
+      expect(events[0].$1, 'counter');
+      expect(events[0].$2, FlowKind.store);
+      expect(events[0].$3, 1);
+      expect(events[0].$4, 2);
+      s.dispose();
+    });
+
+    test('onObservableChanged fires with null label', () {
+      final events = <(String?, FlowKind, Object?, Object?)>[];
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (label, kind, old, next) =>
+            events.add((label, kind, old, next)),
+      );
+      final s = Store(10);
+      s.value = 20;
+      expect(events.length, 1);
+      expect(events[0].$1, isNull);
+      s.dispose();
+    });
+
+    test('onObservableChanged does not fire when value unchanged', () {
+      var callCount = 0;
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (_, __, ___, ____) => callCount++,
+      );
+      final s = Store(42, debugLabel: 'x');
+      s.value = 42;
+      expect(callCount, 0);
+      s.dispose();
+    });
+
+    test('onObservableChanged does not fire when observer is null', () {
+      var called = false;
+      Pureflow.observer = null;
+      final s = Store(1, debugLabel: 'x');
+      s.value = 2;
+      expect(called, isFalse);
+      s.dispose();
+    });
+
+    test('observer callback exception does not break reactivity', () {
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
+      );
+      final s = Store(1, debugLabel: 'x');
+      var listenerCalled = false;
+      s.addListener(() => listenerCalled = true);
+      expect(() => s.value = 2, returnsNormally);
+      expect(listenerCalled, isTrue);
+      s.dispose();
+    });
+
+    test('onCreated exception does not prevent store creation', () {
+      Pureflow.observer = FlowObserver(
+        onCreated: (_, __) => throw Exception('boom'),
+      );
+      expect(() => Store(1, debugLabel: 'x'), returnsNormally);
+    });
+
+    test('onObservableChanged not fired for disposed store', () {
+      var callCount = 0;
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (_, __, ___, ____) => callCount++,
+      );
+      final s = Store(1, debugLabel: 'x');
+      s.dispose();
+      s.value = 2;
+      expect(callCount, 0);
+      s.dispose();
+    });
+
+    test('equality check still works with observer set', () {
+      var callCount = 0;
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (_, __, ___, ____) => callCount++,
+      );
+      final s = Store(42, debugLabel: 'x');
+      s.value = 42;
+      expect(callCount, 0);
+      s.dispose();
+    });
+  });
+}

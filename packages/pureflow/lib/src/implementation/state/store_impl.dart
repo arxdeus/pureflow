@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 import 'package:pureflow/src/batch.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
+import 'package:pureflow/src/observer.dart';
 import 'package:pureflow/src/store.dart';
 
 // ============================================================================
@@ -11,9 +12,18 @@ import 'package:pureflow/src/store.dart';
 /// Implementation of [Store].
 @internal
 class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
-  StoreImpl(this._value, {bool Function(T, T)? equality})
-      : _equals = equality ?? defaultEquals;
+  StoreImpl(this._value, {bool Function(T, T)? equality, this.debugLabel})
+      : _equals = equality ?? defaultEquals {
+    final observer = Pureflow.observer;
+    if (observer != null && observer.onCreated != null) {
+      try {
+        observer.onCreated!(debugLabel, FlowKind.store);
+      } catch (_) {}
+    }
+  }
 
+  @override
+  final String? debugLabel;
   T _value;
   bool inBatch = false;
   final bool Function(T, T) _equals;
@@ -37,7 +47,20 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
 
     if (_equals(_value, newValue)) return;
 
+    final observer = Pureflow.observer;
+    final hasObserver = observer != null && observer.onObservableChanged != null;
+    Object? oldValue;
+    if (hasObserver) {
+      oldValue = _value;
+    }
+
     _value = newValue;
+
+    if (hasObserver) {
+      try {
+        observer.onObservableChanged!(debugLabel, FlowKind.store, oldValue, newValue);
+      } catch (_) {}
+    }
 
     // Handle batching - defer notification
     if (batchDepth > 0) {
@@ -65,5 +88,8 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   void update(T Function(T) updater) => value = updater(_value);
 
   @override
-  String toString() => 'Store<$T>($_value)';
+  String toString() {
+    final label = debugLabel;
+    return label != null ? 'Store<$T>[$label]($_value)' : 'Store<$T>($_value)';
+  }
 }
