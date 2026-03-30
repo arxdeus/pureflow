@@ -20,11 +20,7 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   ComputedImpl(this._compute, {bool Function(T, T)? equality, this.debugLabel})
       : _equals = equality ?? defaultEquals {
     final observer = Pureflow.observer;
-    if (observer != null && observer.onCreated != null) {
-      try {
-        observer.onCreated!(debugLabel, FlowKind.computed);
-      } catch (_) {}
-    }
+    observer?.onCreated?.call(debugLabel, FlowKind.computed);
   }
 
   @override
@@ -111,18 +107,17 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     if (shouldNotify) {
       final observer = Pureflow.observer;
       Object? oldValue;
-      if (observer != null && observer.onObservableChanged != null) {
-        oldValue = _viewStatus.hasFlag(hasValueBit) ? _value : null;
-      }
+      oldValue = _viewStatus.hasFlag(hasValueBit) ? _value : null;
 
       _viewStatus = _viewStatus.setFlag(hasValueBit);
       _value = newValue;
 
-      if (observer != null && observer.onObservableChanged != null) {
-        try {
-          observer.onObservableChanged!(debugLabel, FlowKind.computed, oldValue, newValue);
-        } catch (_) {}
-      }
+      observer?.onObservableChanged?.call(
+        debugLabel,
+        FlowKind.computed,
+        oldValue,
+        newValue,
+      );
 
       notifySubscribers();
     }
@@ -204,14 +199,16 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
 
   @override
   String toString() {
-    final label = debugLabel;
-    final viewStatus = _viewStatus;
-    if (viewStatus.hasFlag(viewDisposedBit)) {
-      return label != null ? 'Computed<$T>[$label](disposed)' : 'Computed<$T>(disposed)';
+    final sb = StringBuffer('Computed<$T>');
+    if (debugLabel != null) {
+      sb.write('[$debugLabel]');
     }
-    if (viewStatus.hasFlag(dirtyBit)) {
-      return label != null ? 'Computed<$T>[$label](dirty)' : 'Computed<$T>(dirty)';
-    }
-    return label != null ? 'Computed<$T>[$label]($_value)' : 'Computed<$T>($_value)';
+    final state = switch (_viewStatus) {
+      _ when _viewStatus.hasFlag(viewDisposedBit) => 'disposed',
+      _ when _viewStatus.hasFlag(dirtyBit) => 'dirty',
+      _ => '$_value',
+    };
+    sb.write('($state)');
+    return sb.toString();
   }
 }

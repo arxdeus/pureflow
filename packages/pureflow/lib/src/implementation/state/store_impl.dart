@@ -15,11 +15,7 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   StoreImpl(this._value, {bool Function(T, T)? equality, this.debugLabel})
       : _equals = equality ?? defaultEquals {
     final observer = Pureflow.observer;
-    if (observer != null && observer.onCreated != null) {
-      try {
-        observer.onCreated!(debugLabel, FlowKind.store);
-      } catch (_) {}
-    }
+    observer?.onCreated?.call(debugLabel, FlowKind.store);
   }
 
   @override
@@ -48,19 +44,22 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
     if (_equals(_value, newValue)) return;
 
     final observer = Pureflow.observer;
-    final hasObserver = observer != null && observer.onObservableChanged != null;
-    Object? oldValue;
+    final hasObserver =
+        observer != null && observer.onObservableChanged != null;
+
+    late final Object? oldValue;
     if (hasObserver) {
       oldValue = _value;
     }
 
     _value = newValue;
 
-    if (hasObserver) {
-      try {
-        observer.onObservableChanged!(debugLabel, FlowKind.store, oldValue, newValue);
-      } catch (_) {}
-    }
+    observer?.onObservableChanged?.call(
+      debugLabel,
+      FlowKind.store,
+      oldValue,
+      newValue,
+    );
 
     // Handle batching - defer notification
     if (batchDepth > 0) {
@@ -89,7 +88,11 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
 
   @override
   String toString() {
-    final label = debugLabel;
-    return label != null ? 'Store<$T>[$label]($_value)' : 'Store<$T>($_value)';
+    final sb = StringBuffer('Store<$T>');
+    if (debugLabel != null) {
+      sb.write('[$debugLabel]');
+    }
+    sb.write('($_value)');
+    return sb.toString();
   }
 }

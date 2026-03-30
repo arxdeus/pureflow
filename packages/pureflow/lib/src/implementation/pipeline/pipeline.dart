@@ -21,11 +21,7 @@ class PipelineImpl implements Pipeline {
     this.debugLabel,
   }) : _taskStream = TaskStream(transformer: transformer) {
     final observer = Pureflow.observer;
-    if (observer != null && observer.onCreated != null) {
-      try {
-        observer.onCreated!(debugLabel, FlowKind.pipeline);
-      } catch (_) {}
-    }
+    observer?.onCreated?.call(debugLabel, FlowKind.pipeline);
   }
 
   /// Runs a task through the pipeline event bus.
@@ -38,11 +34,7 @@ class PipelineImpl implements Pipeline {
     String? debugLabel,
   }) {
     final observer = Pureflow.observer;
-    if (observer != null && observer.onPipelineEvent != null) {
-      try {
-        observer.onPipelineEvent!(this.debugLabel, debugLabel);
-      } catch (_) {}
-    }
+    observer?.onPipelineEvent?.call(this.debugLabel, debugLabel);
 
     final completer = Completer<R>.sync();
     _taskStream.add(
