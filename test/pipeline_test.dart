@@ -6,6 +6,176 @@ import 'package:pureflow/pureflow.dart';
 import 'package:test/test.dart';
 
 void main() {
+  tearDown(() {
+    Pureflow.observer = null;
+  });
+
+  // ============================================================================
+  // debugLabel
+  // ============================================================================
+
+  group('Pipeline - debugLabel', () {
+    test('debugLabel is null by default', () async {
+      final pipeline = Pipeline(transformer: _sequentialTransformer);
+      expect(pipeline.debugLabel, isNull);
+      await pipeline.dispose();
+    });
+
+    test('debugLabel is set when provided', () async {
+      final pipeline = Pipeline(
+        transformer: _sequentialTransformer,
+        debugLabel: 'myPipeline',
+      );
+      expect(pipeline.debugLabel, 'myPipeline');
+      await pipeline.dispose();
+    });
+  });
+
+  // ============================================================================
+  // Observer - onCreated
+  // ============================================================================
+
+  group('Pipeline - observer onCreated', () {
+    test('onCreated fires with null label when no debugLabel', () async {
+      final events = <(String?, FlowKind)>[];
+      Pureflow.observer = FlowObserver(
+        onCreated: (label, kind) => events.add((label, kind)),
+      );
+
+      final pipeline = Pipeline(transformer: _sequentialTransformer);
+      expect(events, [(null, FlowKind.pipeline)]);
+      await pipeline.dispose();
+    });
+
+    test('onCreated fires with label when debugLabel provided', () async {
+      final events = <(String?, FlowKind)>[];
+      Pureflow.observer = FlowObserver(
+        onCreated: (label, kind) => events.add((label, kind)),
+      );
+
+      final pipeline = Pipeline(
+        transformer: _sequentialTransformer,
+        debugLabel: 'myPipeline',
+      );
+      expect(events, [('myPipeline', FlowKind.pipeline)]);
+      await pipeline.dispose();
+    });
+
+    test('onCreated not called when observer is null', () async {
+      var called = false;
+      Pureflow.observer = FlowObserver(
+        onCreated: (_, __) => called = true,
+      );
+      Pureflow.observer = null;
+
+      Pipeline(transformer: _sequentialTransformer);
+      expect(called, false);
+    });
+
+    test('onCreated exception does not crash pipeline creation', () async {
+      Pureflow.observer = FlowObserver(
+        onCreated: (_, __) => throw Exception('observer error'),
+      );
+
+      final pipeline = Pipeline(transformer: _sequentialTransformer);
+      final result = await pipeline.run((ctx) async => 42);
+      expect(result, 42);
+      await pipeline.dispose();
+    });
+  });
+
+  // ============================================================================
+  // Observer - onPipelineEvent
+  // ============================================================================
+
+  group('Pipeline - observer onPipelineEvent', () {
+    test('onPipelineEvent fires with null labels when no debugLabels', () async {
+      final events = <(String?, String?)>[];
+      Pureflow.observer = FlowObserver(
+        onPipelineEvent: (pLabel, eLabel) => events.add((pLabel, eLabel)),
+      );
+
+      final pipeline = Pipeline(transformer: _sequentialTransformer);
+      await pipeline.run((ctx) async => null);
+
+      expect(events, [(null, null)]);
+      await pipeline.dispose();
+    });
+
+    test('onPipelineEvent fires with pipeline label', () async {
+      final events = <(String?, String?)>[];
+      Pureflow.observer = FlowObserver(
+        onPipelineEvent: (pLabel, eLabel) => events.add((pLabel, eLabel)),
+      );
+
+      final pipeline = Pipeline(
+        transformer: _sequentialTransformer,
+        debugLabel: 'myPipeline',
+      );
+      await pipeline.run((ctx) async => null);
+
+      expect(events, [('myPipeline', null)]);
+      await pipeline.dispose();
+    });
+
+    test('onPipelineEvent fires with run debugLabel', () async {
+      final events = <(String?, String?)>[];
+      Pureflow.observer = FlowObserver(
+        onPipelineEvent: (pLabel, eLabel) => events.add((pLabel, eLabel)),
+      );
+
+      final pipeline = Pipeline(
+        transformer: _sequentialTransformer,
+        debugLabel: 'myPipeline',
+      );
+      await pipeline.run((ctx) async => null, debugLabel: 'fetchUser');
+
+      expect(events, [('myPipeline', 'fetchUser')]);
+      await pipeline.dispose();
+    });
+
+    test('onPipelineEvent fires for each run call', () async {
+      final events = <(String?, String?)>[];
+      Pureflow.observer = FlowObserver(
+        onPipelineEvent: (pLabel, eLabel) => events.add((pLabel, eLabel)),
+      );
+
+      final pipeline = Pipeline(
+        transformer: _sequentialTransformer,
+        debugLabel: 'p',
+      );
+      await pipeline.run((ctx) async => null, debugLabel: 'a');
+      await pipeline.run((ctx) async => null, debugLabel: 'b');
+
+      expect(events, [('p', 'a'), ('p', 'b')]);
+      await pipeline.dispose();
+    });
+
+    test('onPipelineEvent not called when observer is null', () async {
+      var called = false;
+      Pureflow.observer = FlowObserver(
+        onPipelineEvent: (_, __) => called = true,
+      );
+      Pureflow.observer = null;
+
+      final pipeline = Pipeline(transformer: _sequentialTransformer);
+      await pipeline.run((ctx) async => null);
+      expect(called, false);
+      await pipeline.dispose();
+    });
+
+    test('onPipelineEvent exception does not crash run', () async {
+      Pureflow.observer = FlowObserver(
+        onPipelineEvent: (_, __) => throw Exception('observer error'),
+      );
+
+      final pipeline = Pipeline(transformer: _sequentialTransformer);
+      final result = await pipeline.run((ctx) async => 99);
+      expect(result, 99);
+      await pipeline.dispose();
+    });
+  });
+
   // ============================================================================
   // Basic Operations
   // ============================================================================

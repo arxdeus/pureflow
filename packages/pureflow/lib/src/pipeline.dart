@@ -163,7 +163,11 @@ abstract class Pipeline {
   /// ```
   factory Pipeline({
     required EventTransformer<dynamic, dynamic> transformer,
+    String? debugLabel,
   }) = PipelineImpl;
+
+  /// An optional label for debugging and observation.
+  String? get debugLabel;
 
   /// Runs an asynchronous task through the pipeline.
   ///
@@ -208,8 +212,9 @@ abstract class Pipeline {
   /// }
   /// ```
   Future<R> run<R>(
-    Future<R> Function(PipelineEventContext context) task,
-  );
+    Future<R> Function(PipelineEventContext context) task, {
+    String? debugLabel,
+  });
 
   /// Disposes the pipeline and releases all resources.
   ///
