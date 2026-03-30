@@ -1,5 +1,4 @@
 import 'package:pureflow/pureflow.dart';
-import 'package:pureflow/pureflow.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -1063,7 +1062,7 @@ void addDebugLabelTests() {
         onCreated: (label, kind) => events.add((label, kind)),
       );
       final s = Store(1, debugLabel: 'myStore');
-      expect(events, [(('myStore', FlowKind.store))]);
+      expect(events, [('myStore', FlowKind.store)]);
       s.dispose();
     });
 
@@ -1073,12 +1072,12 @@ void addDebugLabelTests() {
         onCreated: (label, kind) => events.add((label, kind)),
       );
       final s = Store(1);
-      expect(events, [((null, FlowKind.store))]);
+      expect(events, [(null, FlowKind.store)]);
       s.dispose();
     });
 
     test('onCreated does not fire when observer is null', () {
-      var called = false;
+      const called = false;
       Pureflow.observer = null;
       final s = Store(1, debugLabel: 'x');
       expect(called, isFalse);
@@ -1126,7 +1125,7 @@ void addDebugLabelTests() {
     });
 
     test('onObservableChanged does not fire when observer is null', () {
-      var called = false;
+      const called = false;
       Pureflow.observer = null;
       final s = Store(1, debugLabel: 'x');
       s.value = 2;

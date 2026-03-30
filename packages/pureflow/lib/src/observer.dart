@@ -4,13 +4,13 @@ import 'package:pureflow/src/store.dart';
 
 /// The kind of Pureflow reactive primitive.
 enum FlowKind {
-  /// A [Store] — mutable reactive value holder.
+  /// [Store] - mutable reactive value holder.
   store,
 
-  /// A [Computed] — derived reactive value.
+  /// [Computed] - derived reactive value.
   computed,
 
-  /// A [Pipeline] — async task executor.
+  /// [Pipeline] - async task executor.
   pipeline,
 }
 
@@ -26,7 +26,7 @@ enum FlowKind {
 /// Computed triggers, etc.) from within callbacks. Doing so may cause re-entrant
 /// notifications and unpredictable behavior.
 ///
-/// Observer callbacks are wrapped in try-catch internally — if a callback throws,
+/// Observer callbacks are wrapped in try-catch internally - if a callback throws,
 /// the error is silently swallowed to protect the reactive system.
 ///
 /// ## Example
@@ -47,10 +47,10 @@ enum FlowKind {
 class FlowObserver {
   /// Called when a [Store] or [Computed] value changes.
   ///
-  /// - [debugLabel]: The label of the observable (null if not set).
-  /// - [kind]: Whether this is a [Store] or [Computed].
-  /// - [oldValue]: The previous value (null for first Computed evaluation).
-  /// - [newValue]: The new value.
+  /// - `debugLabel`: The label of the observable (null if not set).
+  /// - `kind`: Whether this is a [Store] or [Computed].
+  /// - `oldValue`: The previous value (null for first Computed evaluation).
+  /// - `newValue`: The new value.
   final void Function(
     String? debugLabel,
     FlowKind kind,
@@ -60,8 +60,8 @@ class FlowObserver {
 
   /// Called when [Pipeline.run] is invoked.
   ///
-  /// - [pipelineLabel]: The debugLabel of the pipeline (null if not set).
-  /// - [eventLabel]: The debugLabel of the specific run() call (null if not set).
+  /// - `pipelineLabel`: The debugLabel of the pipeline (null if not set).
+  /// - `eventLabel`: The debugLabel of the specific run() call (null if not set).
   final void Function(
     String? pipelineLabel,
     String? eventLabel,
@@ -69,14 +69,14 @@ class FlowObserver {
 
   /// Called when a new [Store], [Computed], or [Pipeline] is created.
   ///
-  /// - [debugLabel]: The label of the created object (null if not set).
-  /// - [kind]: The type of object created.
+  /// - `debugLabel`: The label of the created object (null if not set).
+  /// - `kind`: The type of object created.
   final void Function(
     String? debugLabel,
     FlowKind kind,
   )? onCreated;
 
-  /// Creates a [FlowObserver] with optional callbacks.
+  /// Creates a `FlowObserver` with optional callbacks.
   const FlowObserver({
     this.onObservableChanged,
     this.onPipelineEvent,
@@ -101,7 +101,7 @@ class FlowObserver {
 abstract final class Pureflow {
   /// The global observer for all Pureflow reactive primitives.
   ///
-  /// Set to a [FlowObserver] instance to receive callbacks.
+  /// Set to a `FlowObserver` instance to receive callbacks.
   /// Set to `null` to disable observation (default).
   ///
   /// When `null`, all observer hooks are zero-cost (single null check).

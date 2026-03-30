@@ -970,147 +970,151 @@ void main() {
   // ============================================================================
 
   group('Computed - debugLabel', () {
-  tearDown(() {
-    Pureflow.observer = null;
-  });
+    tearDown(() {
+      Pureflow.observer = null;
+    });
 
-  test('debugLabel is null by default', () {
-    final c = Computed(() => 42);
-    expect(c.debugLabel, isNull);
-    c.dispose();
-  });
+    test('debugLabel is null by default', () {
+      final c = Computed(() => 42);
+      expect(c.debugLabel, isNull);
+      c.dispose();
+    });
 
-  test('debugLabel is set when provided', () {
-    final c = Computed(() => 42, debugLabel: 'myComputed');
-    expect(c.debugLabel, 'myComputed');
-    c.dispose();
-  });
+    test('debugLabel is set when provided', () {
+      final c = Computed(() => 42, debugLabel: 'myComputed');
+      expect(c.debugLabel, 'myComputed');
+      c.dispose();
+    });
 
-  test('toString includes label when set', () {
-    final c = Computed(() => 42, debugLabel: 'myComputed');
-    c.value; // trigger computation
-    expect(c.toString(), 'Computed<int>[myComputed](42)');
-    c.dispose();
-  });
+    test('toString includes label when set', () {
+      final c = Computed(() => 42, debugLabel: 'myComputed');
+      c.value; // trigger computation
+      expect(c.toString(), 'Computed<int>[myComputed](42)');
+      c.dispose();
+    });
 
-  test('toString without label unchanged', () {
-    final c = Computed(() => 42);
-    c.value;
-    expect(c.toString(), 'Computed<int>(42)');
-    c.dispose();
-  });
+    test('toString without label unchanged', () {
+      final c = Computed(() => 42);
+      c.value;
+      expect(c.toString(), 'Computed<int>(42)');
+      c.dispose();
+    });
 
-  test('toString dirty with label', () {
-    final s = Store(1);
-    final c = Computed(() => s.value, debugLabel: 'dep');
-    c.value;
-    s.value = 2;
-    expect(c.toString(), 'Computed<int>[dep](dirty)');
-    s.dispose();
-    c.dispose();
-  });
+    test('toString dirty with label', () {
+      final s = Store(1);
+      final c = Computed(() => s.value, debugLabel: 'dep');
+      c.value;
+      s.value = 2;
+      expect(c.toString(), 'Computed<int>[dep](dirty)');
+      s.dispose();
+      c.dispose();
+    });
 
-  test('toString disposed with label', () {
-    final c = Computed(() => 42, debugLabel: 'gone');
-    c.value;
-    c.dispose();
-    expect(c.toString(), 'Computed<int>[gone](disposed)');
-  });
+    test('toString disposed with label', () {
+      final c = Computed(() => 42, debugLabel: 'gone');
+      c.value;
+      c.dispose();
+      expect(c.toString(), 'Computed<int>[gone](disposed)');
+    });
 
-  test('onCreated fires with label and FlowKind.computed', () {
-    String? capturedLabel;
-    FlowKind? capturedKind;
-    Pureflow.observer = FlowObserver(
-      onCreated: (label, kind) {
-        capturedLabel = label;
-        capturedKind = kind;
-      },
-    );
-    final c = Computed(() => 1, debugLabel: 'created');
-    expect(capturedLabel, 'created');
-    expect(capturedKind, FlowKind.computed);
-    c.dispose();
-  });
+    test('onCreated fires with label and FlowKind.computed', () {
+      String? capturedLabel;
+      FlowKind? capturedKind;
+      Pureflow.observer = FlowObserver(
+        onCreated: (label, kind) {
+          capturedLabel = label;
+          capturedKind = kind;
+        },
+      );
+      final c = Computed(() => 1, debugLabel: 'created');
+      expect(capturedLabel, 'created');
+      expect(capturedKind, FlowKind.computed);
+      c.dispose();
+    });
 
-  test('onCreated fires with null label when no debugLabel', () {
-    String? capturedLabel;
-    FlowKind? capturedKind;
-    Pureflow.observer = FlowObserver(
-      onCreated: (label, kind) {
-        capturedLabel = label;
-        capturedKind = kind;
-      },
-    );
-    final c = Computed(() => 1);
-    expect(capturedLabel, isNull);
-    expect(capturedKind, FlowKind.computed);
-    c.dispose();
-  });
+    test('onCreated fires with null label when no debugLabel', () {
+      String? capturedLabel;
+      FlowKind? capturedKind;
+      Pureflow.observer = FlowObserver(
+        onCreated: (label, kind) {
+          capturedLabel = label;
+          capturedKind = kind;
+        },
+      );
+      final c = Computed(() => 1);
+      expect(capturedLabel, isNull);
+      expect(capturedKind, FlowKind.computed);
+      c.dispose();
+    });
 
-  test('onObservableChanged fires on value change with label', () {
-    final s = Store(1);
-    final events = <(String?, FlowKind, Object?, Object?)>[];
-    Pureflow.observer = FlowObserver(
-      onObservableChanged: (label, kind, oldValue, newValue) {
-        if (kind == FlowKind.computed) {
+    test('onObservableChanged fires on value change with label', () {
+      final s = Store(1);
+      final events = <(String?, FlowKind, Object?, Object?)>[];
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (label, kind, oldValue, newValue) {
+          if (kind == FlowKind.computed) {
+            events.add((label, kind, oldValue, newValue));
+          }
+        },
+      );
+      final c = Computed(() => s.value * 2, debugLabel: 'doubled');
+      c.value; // first eval — fires with null oldValue
+      s.value = 5;
+      c.value; // triggers recompute → second notification
+      expect(events.length, 2);
+      expect(events[1].$1, 'doubled');
+      expect(events[1].$2, FlowKind.computed);
+      expect(events[1].$3, 2); // oldValue
+      expect(events[1].$4, 10); // newValue
+      s.dispose();
+      c.dispose();
+    });
+
+    test('onObservableChanged fires with null oldValue on first evaluation',
+        () {
+      final s = Store(1);
+      final events = <(String?, FlowKind, Object?, Object?)>[];
+      Pureflow.observer = FlowObserver(
+        onObservableChanged: (label, kind, oldValue, newValue) {
           events.add((label, kind, oldValue, newValue));
-        }
-      },
-    );
-    final c = Computed(() => s.value * 2, debugLabel: 'doubled');
-    c.value; // first eval — fires with null oldValue
-    s.value = 5;
-    c.value; // triggers recompute → second notification
-    expect(events.length, 2);
-    expect(events[1].$1, 'doubled');
-    expect(events[1].$2, FlowKind.computed);
-    expect(events[1].$3, 2); // oldValue
-    expect(events[1].$4, 10); // newValue
-    s.dispose();
-    c.dispose();
-  });
+        },
+      );
+      final c = Computed(() => s.value, debugLabel: 'first');
+      c.value; // first eval — hasValueBit not set yet → oldValue = null
+      expect(events.length, 1);
+      expect(events[0].$3, isNull);
+      expect(events[0].$4, 1);
+      s.dispose();
+      c.dispose();
+    });
 
-  test('onObservableChanged fires with null oldValue on first evaluation', () {
-    final s = Store(1);
-    final events = <(String?, FlowKind, Object?, Object?)>[];
-    Pureflow.observer = FlowObserver(
-      onObservableChanged: (label, kind, oldValue, newValue) {
-        events.add((label, kind, oldValue, newValue));
-      },
-    );
-    final c = Computed(() => s.value, debugLabel: 'first');
-    c.value; // first eval — hasValueBit not set yet → oldValue = null
-    expect(events.length, 1);
-    expect(events[0].$3, isNull);
-    expect(events[0].$4, 1);
-    s.dispose();
-    c.dispose();
-  });
+    test('onCreated not called when observer is null', () {
+      const called = false;
+      Pureflow.observer = null;
+      final c = Computed(
+        () => 1,
+        debugLabel: 'x',
+      );
+      expect(called, false);
+      c.dispose();
+    });
 
-  test('onCreated not called when observer is null', () {
-    var called = false;
-    Pureflow.observer = null;
-    final c = Computed(() => 1, debugLabel: 'x', );
-    expect(called, false);
-    c.dispose();
+    test('observer callback exception does not break reactivity', () {
+      Pureflow.observer = FlowObserver(
+        onCreated: (_, __) => throw Exception('boom'),
+        onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
+      );
+      final s = Store(1);
+      final c = Computed(() => s.value, debugLabel: 'safe');
+      expect(() => c.value, returnsNormally);
+      expect(c.value, 1);
+      s.value = 2;
+      expect(() => c.value, returnsNormally);
+      expect(c.value, 2);
+      s.dispose();
+      c.dispose();
+    });
   });
-
-  test('observer callback exception does not break reactivity', () {
-    Pureflow.observer = FlowObserver(
-      onCreated: (_, __) => throw Exception('boom'),
-      onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
-    );
-    final s = Store(1);
-    final c = Computed(() => s.value, debugLabel: 'safe');
-    expect(() => c.value, returnsNormally);
-    expect(c.value, 1);
-    s.value = 2;
-    expect(() => c.value, returnsNormally);
-    expect(c.value, 2);
-    s.dispose();
-    c.dispose();
-  });
-});
 }
 
 enum _Status { pending, running, completed }
