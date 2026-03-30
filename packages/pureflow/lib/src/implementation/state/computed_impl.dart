@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
+import 'package:pureflow/src/observer.dart';
 
 // ============================================================================
 // Equality Check Helpers (Inline for Performance)
@@ -16,9 +17,18 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 /// Implementation of [Computed].
 @internal
 class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
-  ComputedImpl(this._compute, {bool Function(T, T)? equality})
-      : _equals = equality ?? defaultEquals;
+  ComputedImpl(this._compute, {bool Function(T, T)? equality, this.debugLabel})
+      : _equals = equality ?? defaultEquals {
+    final observer = Pureflow.observer;
+    if (observer != null && observer.onCreated != null) {
+      try {
+        observer.onCreated!(debugLabel, FlowKind.computed);
+      } catch (_) {}
+    }
+  }
 
+  @override
+  final String? debugLabel;
   final T Function() _compute;
   final bool Function(T, T) _equals;
   late T _value;
@@ -99,8 +109,21 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
 
     // Only notify if value actually changed
     if (shouldNotify) {
+      final observer = Pureflow.observer;
+      Object? oldValue;
+      if (observer != null && observer.onObservableChanged != null) {
+        oldValue = _viewStatus.hasFlag(hasValueBit) ? _value : null;
+      }
+
       _viewStatus = _viewStatus.setFlag(hasValueBit);
       _value = newValue;
+
+      if (observer != null && observer.onObservableChanged != null) {
+        try {
+          observer.onObservableChanged!(debugLabel, FlowKind.computed, oldValue, newValue);
+        } catch (_) {}
+      }
+
       notifySubscribers();
     }
   }
@@ -181,14 +204,14 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
 
   @override
   String toString() {
+    final label = debugLabel;
     final viewStatus = _viewStatus;
-    // Inline bit checks
     if (viewStatus.hasFlag(viewDisposedBit)) {
-      return 'Computed<$T>(disposed)';
+      return label != null ? 'Computed<$T>[$label](disposed)' : 'Computed<$T>(disposed)';
     }
     if (viewStatus.hasFlag(dirtyBit)) {
-      return 'Computed<$T>(dirty)';
+      return label != null ? 'Computed<$T>[$label](dirty)' : 'Computed<$T>(dirty)';
     }
-    return 'Computed<$T>($_value)';
+    return label != null ? 'Computed<$T>[$label]($_value)' : 'Computed<$T>($_value)';
   }
 }
