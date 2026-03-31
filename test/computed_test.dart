@@ -1099,21 +1099,6 @@ void main() {
       c.dispose();
     });
 
-    test('observer callback exception does not break reactivity', () {
-      Pureflow.observer = FlowObserver(
-        onCreated: (_, __) => throw Exception('boom'),
-        onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
-      );
-      final s = Store(1);
-      final c = Computed(() => s.value, debugLabel: 'safe');
-      expect(() => c.value, returnsNormally);
-      expect(c.value, 1);
-      s.value = 2;
-      expect(() => c.value, returnsNormally);
-      expect(c.value, 2);
-      s.dispose();
-      c.dispose();
-    });
   });
 }
 

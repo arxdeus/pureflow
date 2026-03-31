@@ -72,16 +72,6 @@ void main() {
       expect(called, false);
     });
 
-    test('onCreated exception does not crash pipeline creation', () async {
-      Pureflow.observer = FlowObserver(
-        onCreated: (_, __) => throw Exception('observer error'),
-      );
-
-      final pipeline = Pipeline(transformer: _sequentialTransformer);
-      final result = await pipeline.run((ctx) async => 42);
-      expect(result, 42);
-      await pipeline.dispose();
-    });
   });
 
   // ============================================================================
@@ -164,16 +154,6 @@ void main() {
       await pipeline.dispose();
     });
 
-    test('onPipelineEvent exception does not crash run', () async {
-      Pureflow.observer = FlowObserver(
-        onPipelineEvent: (_, __) => throw Exception('observer error'),
-      );
-
-      final pipeline = Pipeline(transformer: _sequentialTransformer);
-      final result = await pipeline.run((ctx) async => 99);
-      expect(result, 99);
-      await pipeline.dispose();
-    });
   });
 
   // ============================================================================

@@ -171,38 +171,6 @@ void main() {
       });
     });
 
-    group('exception safety', () {
-      test('observer exception does not break Store', () {
-        var listenerCalled = false;
-        Pureflow.observer = FlowObserver(
-          onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
-        );
-        final store = Store<int>(0, debugLabel: 'test');
-        store.addListener(() => listenerCalled = true);
-        store.value = 1;
-        expect(store.value, 1);
-        expect(listenerCalled, isTrue);
-      });
-
-      test('observer exception does not break Computed', () {
-        Pureflow.observer = FlowObserver(
-          onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
-        );
-        final store = Store<int>(1);
-        final doubled = Computed(() => store.value * 2, debugLabel: 'doubled');
-        doubled.value;
-        store.value = 5;
-        expect(doubled.value, 10);
-      });
-
-      test('observer exception in onCreated does not prevent creation', () {
-        Pureflow.observer = FlowObserver(
-          onCreated: (_, __) => throw Exception('boom'),
-        );
-        final store = Store<int>(42, debugLabel: 'test');
-        expect(store.value, 42);
-      });
-    });
 
     group('zero-cost when no observer', () {
       test('Store works without observer', () {

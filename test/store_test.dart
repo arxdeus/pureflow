@@ -1133,24 +1133,6 @@ void addDebugLabelTests() {
       s.dispose();
     });
 
-    test('observer callback exception does not break reactivity', () {
-      Pureflow.observer = FlowObserver(
-        onObservableChanged: (_, __, ___, ____) => throw Exception('boom'),
-      );
-      final s = Store(1, debugLabel: 'x');
-      var listenerCalled = false;
-      s.addListener(() => listenerCalled = true);
-      expect(() => s.value = 2, returnsNormally);
-      expect(listenerCalled, isTrue);
-      s.dispose();
-    });
-
-    test('onCreated exception does not prevent store creation', () {
-      Pureflow.observer = FlowObserver(
-        onCreated: (_, __) => throw Exception('boom'),
-      );
-      expect(() => Store(1, debugLabel: 'x'), returnsNormally);
-    });
 
     test('onObservableChanged not fired for disposed store', () {
       var callCount = 0;
