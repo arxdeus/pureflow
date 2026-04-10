@@ -1,6 +1,42 @@
 # Changelog
 
 ---
+## [1.1.0]
+
+### Bug Fixes
+
+- **(batch)** fix flushBatch re-entrancy and add buffer shrink - ([e0527db](https://github.com/arxdeus/pureflow/commit/e0527db163f410a5dd4d36dc46510fde25c001b7))
+- **(benchmark)** equals benchmarks - ([dbcb047](https://github.com/arxdeus/pureflow/commit/dbcb0470e4b2f691f77fa0a7229d08f9ad87bfd3))
+- **(dependency_node)** remove stale methods - ([42ff561](https://github.com/arxdeus/pureflow/commit/42ff56141933482190bd9cc6dfaecf4f2eb80c44))
+- **(observer)** fix export order and doc imports in observer - ([5e43d7f](https://github.com/arxdeus/pureflow/commit/5e43d7f0d3d0f5eac4e4d85512a985aef16cfe5f))
+- styling fixes - ([b24b9b5](https://github.com/arxdeus/pureflow/commit/b24b9b5c4dd70c4e01a356d43ff42d35bfc49566))
+- readability - ([9b319c3](https://github.com/arxdeus/pureflow/commit/9b319c3a0259cc7918059427aa0b0657ebcba4ac))
+
+### Features
+
+- **(computed)** add debugLabel and observer hooks to Computed - ([6f8623a](https://github.com/arxdeus/pureflow/commit/6f8623ae79c822cf1fca88f4e7b5d1597f3f95de))
+- **(observer)** add FlowObserver class and Pureflow accessor - ([8e606ad](https://github.com/arxdeus/pureflow/commit/8e606ad658d3e196517919436dba559da8eb8276))
+- **(pipeline)** add debugLabel and observer hooks to Pipeline - ([37259d4](https://github.com/arxdeus/pureflow/commit/37259d411adcfea56628b13e48d6feefa96e270f))
+- **(store)** add debugLabel to Store with observer hooks - ([ec49b05](https://github.com/arxdeus/pureflow/commit/ec49b058e0be5826353b1456a21d328803c3e2e6))
+
+### Miscellaneous Chores
+
+- **(interfaces)** `ReactiveValueObservable` styling - ([7541b46](https://github.com/arxdeus/pureflow/commit/7541b4626cfdcff9da6e1a59031bfef580bcf4f0))
+- styling - ([436dce0](https://github.com/arxdeus/pureflow/commit/436dce06eebeb30253377be309efa2f887168baf))
+
+### Performance
+
+- **(dependency_node)** remove DependencyNode object pool - ([1ab7257](https://github.com/arxdeus/pureflow/commit/1ab725733c092c31ccd3ddc06a4a640aa3a46034))
+- **(pipeline)** use ListQueue and cache tear-offs in pipeline - ([cf04ae9](https://github.com/arxdeus/pureflow/commit/cf04ae9398ccda3ee49efca03f37e33a6535450c))
+- **(pureflow)** remove prefer-inline from methods with loops - ([04f8ca5](https://github.com/arxdeus/pureflow/commit/04f8ca56ddd0431388d6b53b2c8b5b1ef9957499))
+- **(reactive)** use O(1) listenernode removal in cancel() - ([ea9d831](https://github.com/arxdeus/pureflow/commit/ea9d8316e2767b146b544a57497ba8f295160639))
+- **(state)** replace nullable _equality with non-nullable _equals - ([c63c5a2](https://github.com/arxdeus/pureflow/commit/c63c5a25e22295793e3846be90c192c34d8fea61))
+
+### Refactoring
+
+- **(state)** fold inBatch and _hasValue into bit flags - ([8775fb2](https://github.com/arxdeus/pureflow/commit/8775fb2538fad2582b67ac1e78aadd05dbf54c23))
+
+---
 ## [1.0.2]
 
 ### Bug Fixes
