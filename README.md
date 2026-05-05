@@ -328,6 +328,43 @@ await pipeline.dispose(force: true);
 ---
 
 ```
+
+#### Bloc-style Typed Events
+
+`Pipeline` runs untyped `Future Function(ctx)` tasks. If you want a `bloc`-like
+ergonomic — an abstract event hierarchy plus per-subtype handlers registered
+via `on<T>(...)` — you can wrap `Pipeline` in a small router that keeps a
+table of `(type, handler)` registrations and dispatches incoming events to
+the matching handler. The router still relies on a single `EventTransformer`,
+so concurrency policy applies uniformly to every event subtype.
+
+```dart
+sealed class CounterEvent {}
+class Incremented extends CounterEvent { final int by; const Incremented(this.by); }
+class Reset       extends CounterEvent { const Reset(); }
+
+final events = EventPipeline<CounterEvent>(
+  transformer: (source, process) => source.asyncExpand(process),
+);
+
+events.on<Incremented>((event, ctx) async => counter.update((v) => v + event.by));
+events.on<Reset>      ((event, ctx) async => counter.value = 0);
+
+await events.add(const Incremented(2));
+await events.add(const Reset());
+```
+
+Two runnable, self-contained examples ship in this repo:
+
+- [`example/typed_event_pipeline.dart`](example/typed_event_pipeline.dart) —
+  the `EventPipeline<E>` abstraction plus a counter feature with a sealed
+  event hierarchy and a sequential transformer.
+- [`example/typed_event_pipeline_search.dart`](example/typed_event_pipeline_search.dart) —
+  search-as-you-type using a `restartable` transformer; intermediate
+  keystrokes are cancelled cooperatively via `PipelineEventContext.isActive`.
+
+---
+
 ## Flutter Integration
 
 The `pureflow_flutter` package provides seamless integration with Flutter's widget system through zero-overhead adapters.
