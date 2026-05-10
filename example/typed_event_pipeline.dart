@@ -87,8 +87,7 @@ class EventPipeline<E extends Object> {
     if (_disposed) {
       throw StateError('EventPipeline has been disposed.');
     }
-    final alreadyRegistered =
-        _registrations.any((r) => r.type == T);
+    final alreadyRegistered = _registrations.any((r) => r.type == T);
     if (alreadyRegistered) {
       throw StateError('Handler for $T is already registered.');
     }
@@ -96,8 +95,7 @@ class EventPipeline<E extends Object> {
       _Registration<E>(
         type: T,
         matches: (E event) => event is T,
-        invoke: (E event, PipelineEventContext ctx) =>
-            handler(event as T, ctx),
+        invoke: (E event, PipelineEventContext ctx) => handler(event as T, ctx),
       ),
     );
   }

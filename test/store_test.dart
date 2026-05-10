@@ -1133,7 +1133,6 @@ void addDebugLabelTests() {
       s.dispose();
     });
 
-
     test('onObservableChanged not fired for disposed store', () {
       var callCount = 0;
       Pureflow.observer = FlowObserver(

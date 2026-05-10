@@ -345,14 +345,28 @@ await events.add(const Incremented(2));
 await events.add(const Reset());
 ```
 
-Two runnable, self-contained examples ship in this repo:
+Runnable, self-contained examples ship in this repo:
 
 - [`example/typed_event_pipeline.dart`](example/typed_event_pipeline.dart) —
   the `EventPipeline<E>` abstraction plus a counter feature with a sealed
   event hierarchy and a sequential transformer.
-- [`example/typed_event_pipeline_search.dart`](example/typed_event_pipeline_search.dart) —
-  search-as-you-type using a `restartable` transformer; intermediate
-  keystrokes are cancelled cooperatively via `PipelineEventContext.isActive`.
+
+### Real-world examples
+
+- [`example/search_as_you_type.dart`](example/search_as_you_type.dart) —
+  restartable search; run with `dart run example/search_as_you_type.dart`.
+- [`example/form_validation.dart`](example/form_validation.dart) — reactive
+  form validation; run with `dart run example/form_validation.dart`.
+- [`example/cart_controller.dart`](example/cart_controller.dart) — shopping cart
+  controller with read-only state; run with `dart run example/cart_controller.dart`.
+- [`example/auth_session.dart`](example/auth_session.dart) — auth/session state
+  with an async pipeline; run with `dart run example/auth_session.dart`.
+
+Use the transformer helper style when choosing concurrency:
+
+```dart
+final search = Pipeline(transformer: restartable());
+```
 
 ---
 

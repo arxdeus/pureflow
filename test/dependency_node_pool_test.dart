@@ -5,16 +5,28 @@ void main() {
   group('DependencyNode - No Pool', () {
     test('computed works after dispose and recreate', () {
       final store = Store<int>(0);
-      final computeds = List.generate(100, (_) => Computed(() => store.value * 2));
-      for (final c in computeds) { c.value; }
-      for (final c in computeds) { c.dispose(); }
+      final computeds =
+          List.generate(100, (_) => Computed(() => store.value * 2));
+      for (final c in computeds) {
+        c.value;
+      }
+      for (final c in computeds) {
+        c.dispose();
+      }
 
-      final newComputeds = List.generate(100, (_) => Computed(() => store.value * 3));
-      for (final c in newComputeds) { expect(c.value, 0); }
+      final newComputeds =
+          List.generate(100, (_) => Computed(() => store.value * 3));
+      for (final c in newComputeds) {
+        expect(c.value, 0);
+      }
       store.value = 5;
-      for (final c in newComputeds) { expect(c.value, 15); }
+      for (final c in newComputeds) {
+        expect(c.value, 15);
+      }
 
-      for (final c in newComputeds) { c.dispose(); }
+      for (final c in newComputeds) {
+        c.dispose();
+      }
       store.dispose();
     });
 
@@ -22,7 +34,9 @@ void main() {
       final stores = List.generate(200, Store<int>.new);
       final computed = Computed(() {
         var sum = 0;
-        for (final s in stores) { sum += s.value; }
+        for (final s in stores) {
+          sum += s.value;
+        }
         return sum;
       });
       expect(computed.value, 19900);
@@ -34,7 +48,9 @@ void main() {
       expect(small.value, 101);
 
       small.dispose();
-      for (final s in stores) { s.dispose(); }
+      for (final s in stores) {
+        s.dispose();
+      }
     });
 
     test('rapid create-dispose cycles', () {

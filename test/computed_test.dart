@@ -1098,7 +1098,6 @@ void main() {
       expect(called, false);
       c.dispose();
     });
-
   });
 }
 

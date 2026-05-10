@@ -126,7 +126,8 @@ abstract class Computed<T> implements ReactiveValueObservable<T> {
   /// If [compute] throws an exception, it will propagate to the caller of
   /// [value]. The computed remains in a dirty state and will re-execute
   /// on the next access.
-  factory Computed(T Function() compute, {bool Function(T, T)? equality, String? debugLabel}) =>
+  factory Computed(T Function() compute,
+          {bool Function(T, T)? equality, String? debugLabel}) =>
       ComputedImpl<T>(compute, equality: equality, debugLabel: debugLabel);
 
   /// An optional label for debugging and observation.

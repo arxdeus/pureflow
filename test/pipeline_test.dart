@@ -71,7 +71,6 @@ void main() {
       Pipeline(transformer: _sequentialTransformer);
       expect(called, false);
     });
-
   });
 
   // ============================================================================
@@ -79,7 +78,8 @@ void main() {
   // ============================================================================
 
   group('Pipeline - observer onPipelineEvent', () {
-    test('onPipelineEvent fires with null labels when no debugLabels', () async {
+    test('onPipelineEvent fires with null labels when no debugLabels',
+        () async {
       final events = <(String?, String?)>[];
       Pureflow.observer = FlowObserver(
         onPipelineEvent: (pLabel, eLabel) => events.add((pLabel, eLabel)),
@@ -153,7 +153,6 @@ void main() {
       expect(called, false);
       await pipeline.dispose();
     });
-
   });
 
   // ============================================================================

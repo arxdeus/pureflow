@@ -123,6 +123,7 @@ class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
       void listener() {
         final _ = store.value;
       }
+
       store.addListener(listener);
       _listeners.add(listener);
     }

@@ -76,7 +76,8 @@ class CartController {
   void printReceipt(String label) {
     print('\n$label');
     for (final item in items.value) {
-      print('${item.quantity}x ${item.name}: \$${item.lineTotal.toStringAsFixed(2)}');
+      print(
+          '${item.quantity}x ${item.name}: \$${item.lineTotal.toStringAsFixed(2)}');
     }
     print('subtotal: \$${subtotal.value.toStringAsFixed(2)}');
     print('discount: \$${discount.value.toStringAsFixed(2)}');

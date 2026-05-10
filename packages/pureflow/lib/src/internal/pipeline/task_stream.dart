@@ -10,10 +10,12 @@ import 'package:pureflow/src/pipeline.dart';
 @internal
 class TaskStream {
   final EventTransformer<dynamic, dynamic> transformer;
-  final ListQueue<PipelineEventContext> eventQueue = ListQueue<PipelineEventContext>();
+  final ListQueue<PipelineEventContext> eventQueue =
+      ListQueue<PipelineEventContext>();
   // Use Set for O(1) removal instead of List O(n)
   final Set<PipelineEventContext> _activeEvents = {};
-  late final void Function(PipelineEventContext) _removeActiveEvent = _activeEvents.remove;
+  late final void Function(PipelineEventContext) _removeActiveEvent =
+      _activeEvents.remove;
   Completer<void>? waitingCompleter;
   bool isActive = true;
   bool _isDisposed = false;

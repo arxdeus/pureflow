@@ -127,6 +127,7 @@ class ListenableValueNotifierNotifyManyDependentsBenchmark
       void listener() {
         final _ = notifier.value;
       }
+
       notifier.addListener(listener);
       _listeners.add(listener);
     }

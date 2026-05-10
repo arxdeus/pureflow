@@ -128,7 +128,8 @@ void main() {
         final doubled = Computed(() => store.value * 2, debugLabel: 'doubled');
 
         doubled.value; // initial: null → 2
-        final initial = changes.where((c) => c.$1 == FlowKind.computed).toList();
+        final initial =
+            changes.where((c) => c.$1 == FlowKind.computed).toList();
         expect(initial.length, 1);
         expect(initial[0].$2, isNull);
         expect(initial[0].$3, 2);
@@ -137,7 +138,8 @@ void main() {
         store.value = 5;
         doubled.value; // recompute: 2 → 10
 
-        final recompute = changes.where((c) => c.$1 == FlowKind.computed).toList();
+        final recompute =
+            changes.where((c) => c.$1 == FlowKind.computed).toList();
         expect(recompute.length, 1);
         expect(recompute[0].$2, 2);
         expect(recompute[0].$3, 10);
@@ -170,7 +172,6 @@ void main() {
         expect(capturedEventLabel, 'fetchData');
       });
     });
-
 
     group('zero-cost when no observer', () {
       test('Store works without observer', () {
