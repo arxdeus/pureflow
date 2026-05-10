@@ -32,14 +32,14 @@ Add Pureflow to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  pureflow: ^1.0.0
+  pureflow: ^1.1.0
 ```
 
 For Flutter projects use instead:
 
 ```yaml
 dependencies:
-  pureflow_flutter: ^1.0.0
+  pureflow_flutter: ^1.0.1
 ```
 
 ---
@@ -275,27 +275,19 @@ The `transformer` parameter defines how concurrent tasks are handled:
 
 ```dart
 // Sequential: Process one at a time
-Stream<R> sequential<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-  return source.asyncExpand(process);
-}
-
-// Droppable: Skip events while processing
-Stream<R> droppable<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-  return source.exhaustMap(process);
-}
+final sequentialPipeline = Pipeline(transformer: sequential());
 
 // Restartable: Cancel previous, process latest
-Stream<R> restartable<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-  return source.switchMap(process);
-}
+final restartablePipeline = Pipeline(transformer: restartable());
+
+// Droppable: Skip events while processing
+final droppablePipeline = Pipeline(transformer: droppable());
 
 // Concurrent: Process all at once
-Stream<R> concurrent<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-  return source.flatMap(process);
-}
+final concurrentPipeline = Pipeline(transformer: concurrent());
 ```
 
-> 💡 **Tip**: The [bloc_concurrency](https://pub.dev/packages/bloc_concurrency) package provides ready-to-use transformers that work perfectly with Pipeline.
+For advanced use cases, you can still pass any custom `EventTransformer` to `Pipeline`.
 
 #### Cancellation Pattern
 
@@ -324,10 +316,9 @@ await pipeline.dispose();
 
 // Cancel immediately
 await pipeline.dispose(force: true);
+```
 
 ---
-
-```
 
 #### Bloc-style Typed Events
 
@@ -373,7 +364,7 @@ The `pureflow_flutter` package provides seamless integration with Flutter's widg
 
 ```yaml
 dependencies:
-  pureflow_flutter: ^1.0.0
+  pureflow_flutter: ^1.0.1
 ```
 
 ### Usage with ValueListenableBuilder

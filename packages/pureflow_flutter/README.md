@@ -15,7 +15,7 @@ Add `pureflow_flutter` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  pureflow_flutter: ^1.0.0
+  pureflow_flutter: ^1.0.1
 ```
 
 > **Note**: `pureflow_flutter` automatically includes `pureflow` as a dependency. For core concepts and API documentation, see the [pureflow package](https://pub.dev/packages/pureflow).
