@@ -248,3 +248,4 @@ pubspec.lock
 .fvm/
 !benchmark/bin/
 .hive
+.opencode/
