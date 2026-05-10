@@ -13,3 +13,5 @@ export 'src/observer.dart' show FlowKind, FlowObserver, Pureflow;
 export 'src/pipeline.dart'
     show EventMapper, EventTransformer, Pipeline, PipelineEventContext;
 export 'src/store.dart' show Store;
+export 'src/transformers.dart'
+    show concurrent, droppable, restartable, sequential;

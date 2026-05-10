@@ -20,37 +20,29 @@ export 'implementation/pipeline/pipeline.dart' show PipelineEventContext;
 ///
 /// ### Sequential (one at a time)
 /// ```dart
-/// Stream<R> sequential<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-///   return source.asyncExpand(process);
-/// }
+/// final pipeline = Pipeline(transformer: sequential());
 /// ```
 ///
 /// ### Concurrent (all at once)
 /// ```dart
-/// Stream<R> concurrent<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-///   return source.flatMap(process);
-/// }
+/// final pipeline = Pipeline(transformer: concurrent());
 /// ```
 ///
 /// ### Droppable (skip while processing)
 /// ```dart
-/// Stream<R> droppable<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-///   return source.exhaustMap(process);
-/// }
+/// final pipeline = Pipeline(transformer: droppable());
 /// ```
 ///
 /// ### Restartable (cancel previous)
 /// ```dart
-/// Stream<R> restartable<E, R>(Stream<E> source, Stream<R> Function(E) process) {
-///   return source.switchMap(process);
-/// }
+/// final pipeline = Pipeline(transformer: restartable());
 /// ```
 ///
 /// ## Usage with Pipeline
 ///
 /// ```dart
 /// final pipeline = Pipeline(
-///   transformer: (source, process) => source.asyncExpand(process),
+///   transformer: sequential(),
 /// );
 /// ```
 typedef EventTransformer<E, R> = Stream<R> Function(
@@ -101,9 +93,7 @@ typedef EventMapper<E, R> = Stream<R> Function(E event);
 ///
 /// ```dart
 /// // Create a pipeline with sequential execution
-/// final pipeline = Pipeline(
-///   transformer: (source, process) => source.asyncExpand(process),
-/// );
+/// final pipeline = Pipeline(transformer: sequential());
 ///
 /// // Run tasks through the pipeline
 /// final result = await pipeline.run((context) async {
@@ -130,11 +120,9 @@ typedef EventMapper<E, R> = Stream<R> Function(E event);
 /// });
 /// ```
 ///
-/// ## With bloc_concurrency Transformers
+/// ## With built-in Transformers
 ///
 /// ```dart
-/// import 'package:bloc_concurrency/bloc_concurrency.dart';
-///
 /// // Only process latest event, cancel previous
 /// final searchPipeline = Pipeline(transformer: restartable());
 ///
@@ -154,12 +142,10 @@ abstract class Pipeline {
   /// ## Example
   /// ```dart
   /// // Sequential processing
-  /// final pipeline = Pipeline(
-  ///   transformer: (source, process) => source.asyncExpand(process),
-  /// );
-  ///
-  /// // Using bloc_concurrency
   /// final pipeline = Pipeline(transformer: sequential());
+  ///
+  /// // Parallel processing
+  /// final parallelPipeline = Pipeline(transformer: concurrent());
   /// ```
   factory Pipeline({
     required EventTransformer<dynamic, dynamic> transformer,
