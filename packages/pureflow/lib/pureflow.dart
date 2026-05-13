@@ -1,8 +1,7 @@
-/// Pureflow - A high-performance reactive signals library for Dart and Flutter.
+/// Pureflow - A Pipeline-first reactive state toolkit for Dart and Flutter.
 ///
-/// Pureflow provides a minimal, fast, and type-safe reactive state management
-/// solution. It combines the simplicity of signals with the power of computed
-/// values and controlled async pipelines.
+/// Pureflow makes async concurrency policy explicit with Pipeline, while Store,
+/// Computed, and batching keep state small and predictable.
 library;
 
 export 'src/batch.dart' show batch;

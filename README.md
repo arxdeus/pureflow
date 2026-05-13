@@ -8,21 +8,21 @@
 
 **`pureflow_flutter`**: [![pureflow_flutter](https://img.shields.io/pub/v/pureflow_flutter.svg)](https://pub.dev/packages/pureflow_flutter)
 
-A high-performance reactive state management library for Dart and Flutter
+A Pipeline-first reactive state toolkit for Dart and Flutter
 
-Pureflow provides a minimal, fast, and type-safe reactive state management solution. It combines the simplicity of signals with the power of computed values and controlled async pipelines.
+Pureflow starts from the problem most UI state libraries leave to you: async work. A `Pipeline` lets you choose how tasks run — sequentially, restartably, droppably, or concurrently — while `Store`, `Computed`, and batching keep the resulting state small and predictable.
 
 ---
 
 ## Features
 
-- **🎯 Type-Safe** - Full type inference with no runtime surprises
-- **🎛️ Controlled Async** - Pipeline system for handling concurrency of async operations
-- **🔗 Automatic Dependency Tracking** - Computed values track dependencies automatically
-- **📦 Lazy Evaluation** - Computations only run when accessed
-- **🔄 Batching** - Group multiple updates into a single notification
-- **⚡ Zero-Allocation Listeners** - Linked list-based listener management
-- **🌊 Stream Integration** - Every reactive value is also a `Stream`
+- **🎛️ Pipeline-first async** - Make concurrency policy explicit for searches, saves, background jobs, and event flows
+- **🔁 Built-in task strategies** - Use `sequential()`, `restartable()`, `droppable()`, or `concurrent()` without writing stream plumbing
+- **🎯 Type-safe state** - Model values with `Store<T>` and derive read-only state with `Computed<T>`
+- **🔗 Automatic dependency tracking** - Computed values track exactly what they read
+- **🔄 Batching** - Group multiple state updates into a single notification
+- **⚡ Lightweight listener system** - Linked list-based listener management with low allocation overhead
+- **🌊 Stream integration** - Every reactive value is also a `Stream`
 
 ---
 
@@ -45,6 +45,108 @@ dependencies:
 ---
 
 ## Core Concepts
+
+### Pipeline (Controlled Async)
+
+`Pipeline` is the main entry point when user actions can overlap: search boxes,
+save buttons, auth refreshes, uploads, and background jobs. Instead of hiding
+concurrency in callbacks, Pureflow makes the policy part of the object you run
+work through.
+
+```dart
+import 'package:pureflow/pureflow.dart';
+
+// Latest search wins; older in-flight searches are marked inactive.
+final searchPipeline = Pipeline(transformer: restartable());
+
+final results = await searchPipeline.run((context) async {
+  final response = await fetchSearchResults('flutter');
+
+  if (!context.isActive) return null; // Ignore stale work.
+  return response.items;
+});
+```
+
+#### Choose how tasks overlap
+
+The `transformer` parameter defines what happens when new work arrives before
+previous work finishes:
+
+```dart
+// Process one task at a time.
+final sequentialPipeline = Pipeline(transformer: sequential());
+
+// Keep only the latest task active.
+final restartablePipeline = Pipeline(transformer: restartable());
+
+// Ignore new tasks while one is running.
+final droppablePipeline = Pipeline(transformer: droppable());
+
+// Let every task run immediately.
+final concurrentPipeline = Pipeline(transformer: concurrent());
+```
+
+For advanced use cases, you can still pass any custom `EventTransformer` to
+`Pipeline`.
+
+#### Cancellation pattern
+
+Tasks receive a `PipelineEventContext`. Check `context.isActive` before
+expensive follow-up work or before applying results to state:
+
+```dart
+await searchPipeline.run((context) async {
+  final data = await fetchData();
+  if (!context.isActive) return null;
+
+  return processData(data);
+});
+```
+
+#### Graceful disposal
+
+Pipeline supports both graceful and forced shutdown:
+
+```dart
+// Wait for all tasks to finish.
+await searchPipeline.dispose();
+
+// Cancel immediately.
+await searchPipeline.dispose(force: true);
+```
+
+#### Bloc-style typed events
+
+`Pipeline` runs untyped `Future Function(ctx)` tasks. If you want a `bloc`-like
+ergonomic — an abstract event hierarchy plus per-subtype handlers registered
+via `on<T>(...)` — you can wrap `Pipeline` in a small router that keeps a
+table of `(type, handler)` registrations and dispatches incoming events to
+the matching handler. The router still relies on a single `EventTransformer`,
+so concurrency policy applies uniformly to every event subtype.
+
+```dart
+sealed class CounterEvent {}
+class Incremented extends CounterEvent { final int by; const Incremented(this.by); }
+class Reset       extends CounterEvent { const Reset(); }
+
+final events = EventPipeline<CounterEvent>(
+  transformer: (source, process) => source.asyncExpand(process),
+);
+
+events.on<Incremented>((event, ctx) async => counter.update((v) => v + event.by));
+events.on<Reset>      ((event, ctx) async => counter.value = 0);
+
+await events.add(const Incremented(2));
+await events.add(const Reset());
+```
+
+Runnable, self-contained examples ship in this repo:
+
+- [`example/typed_event_pipeline.dart`](example/typed_event_pipeline.dart) —
+  the `EventPipeline<E>` abstraction plus a counter feature with a sealed
+  event hierarchy and a sequential transformer.
+
+---
 
 ### Store
 
@@ -241,115 +343,6 @@ final result = batch(() {
 });
 print(result); // John Doe
 ```
-
----
-
-### Pipeline (Controlled Async)
-
-`Pipeline` provides structured async task execution with customizable concurrency strategies. It's perfect for:
-
-- Rate limiting API calls
-- Ensuring sequential execution of dependent operations
-- Implementing search-as-you-type with automatic cancellation
-- Managing concurrent background tasks
-
-```dart
-// Create a pipeline with sequential execution
-final pipeline = Pipeline(
-  transformer: (source, process) => source.asyncExpand(process),
-);
-
-// Run tasks through the pipeline
-final result = await pipeline.run((context) async {
-  // Check if still active before expensive operations
-  if (!context.isActive) return null;
-
-  final data = await fetchData();
-  return processData(data);
-});
-```
-
-#### Concurrency Strategies
-
-The `transformer` parameter defines how concurrent tasks are handled:
-
-```dart
-// Sequential: Process one at a time
-final sequentialPipeline = Pipeline(transformer: sequential());
-
-// Restartable: Cancel previous, process latest
-final restartablePipeline = Pipeline(transformer: restartable());
-
-// Droppable: Skip events while processing
-final droppablePipeline = Pipeline(transformer: droppable());
-
-// Concurrent: Process all at once
-final concurrentPipeline = Pipeline(transformer: concurrent());
-```
-
-For advanced use cases, you can still pass any custom `EventTransformer` to `Pipeline`.
-
-#### Cancellation Pattern
-
-Tasks receive a `PipelineEventContext` that allows checking if the task should continue:
-
-```dart
-await pipeline.run((context) async {
-  for (final item in items) {
-    if (!context.isActive) {
-      // Pipeline is being disposed or task was superseded
-      return null;
-    }
-    await processItem(item);
-  }
-  return 'Done';
-});
-```
-
-#### Graceful Disposal
-
-Pipeline supports both graceful and forced shutdown:
-
-```dart
-// Wait for all tasks to finish
-await pipeline.dispose();
-
-// Cancel immediately
-await pipeline.dispose(force: true);
-```
-
----
-
-#### Bloc-style Typed Events
-
-`Pipeline` runs untyped `Future Function(ctx)` tasks. If you want a `bloc`-like
-ergonomic — an abstract event hierarchy plus per-subtype handlers registered
-via `on<T>(...)` — you can wrap `Pipeline` in a small router that keeps a
-table of `(type, handler)` registrations and dispatches incoming events to
-the matching handler. The router still relies on a single `EventTransformer`,
-so concurrency policy applies uniformly to every event subtype.
-
-```dart
-sealed class CounterEvent {}
-class Incremented extends CounterEvent { final int by; const Incremented(this.by); }
-class Reset       extends CounterEvent { const Reset(); }
-
-final events = EventPipeline<CounterEvent>(
-  transformer: (source, process) => source.asyncExpand(process),
-);
-
-events.on<Incremented>((event, ctx) async => counter.update((v) => v + event.by));
-events.on<Reset>      ((event, ctx) async => counter.value = 0);
-
-await events.add(const Incremented(2));
-await events.add(const Reset());
-```
-
-Runnable, self-contained examples ship in this repo:
-
-- [`example/typed_event_pipeline.dart`](example/typed_event_pipeline.dart) —
-  the `EventPipeline<E>` abstraction plus a counter feature with a sealed
-  event hierarchy and a sequential transformer.
 
 ### Real-world examples
 
