@@ -116,4 +116,27 @@ final class PipelineEventContext {
   @internal
   @pragma('vm:prefer-inline')
   void cancel() => _isCancelled = true;
+
+  /// Cancels this event and resolves its [completer] for an event that never
+  /// entered the processing stream (rejected by a disposed/inactive pipeline,
+  /// or dropped from the queue during a forced dispose).
+  ///
+  /// The task is still invoked once with an inactive context so well-behaved
+  /// tasks observe `isActive == false` and return early — matching the
+  /// behaviour of tasks cancelled after they start. Without this the future
+  /// returned by `Pipeline.run` would never complete.
+  @internal
+  Future<void> completeCancelled() async {
+    _isCancelled = true;
+    final eventCompleter = completer;
+    if (eventCompleter.isCompleted) return;
+    try {
+      final result = await Future<dynamic>.sync(() => task(this));
+      if (!eventCompleter.isCompleted) eventCompleter.complete(result);
+    } catch (error, stackTrace) {
+      if (!eventCompleter.isCompleted) {
+        eventCompleter.completeError(error, stackTrace);
+      }
+    }
+  }
 }

@@ -77,8 +77,12 @@ class TaskStream {
   @pragma('vm:prefer-inline')
   void add(PipelineEventContext event) {
     // Optimize: check _isDisposed first (most common case)
-    if (_isDisposed) return event.cancel();
-    if (!isActive) return event.cancel();
+    if (_isDisposed || !isActive) {
+      // Event never enters the stream; resolve its completer so the future
+      // returned by Pipeline.run does not hang.
+      event.completeCancelled();
+      return;
+    }
 
     eventQueue.add(event);
     _completeWaitingCompleter();
