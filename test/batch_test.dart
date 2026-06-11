@@ -1191,4 +1191,303 @@ void main() {
       result.dispose();
     });
   });
+
+  // ============================================================================
+  // Listener Coalescing (regression)
+  // ============================================================================
+
+  group('ValueObservable.batch - Listener Coalescing (regression)', () {
+    test(
+        'computed listener fires once when batch updates multiple dependencies',
+        () {
+      final a = Store(1);
+      final b = Store(2);
+      final sum = Computed(() => a.value + b.value);
+      sum.value; // warm up deps
+      var calls = 0;
+      sum.addListener(() {
+        calls++;
+      });
+      batch(() {
+        a.value = 10;
+        b.value = 20;
+      });
+      expect(calls, 1);
+
+      sum.removeListener(() {});
+      a.dispose();
+      b.dispose();
+      sum.dispose();
+    });
+
+    test('computed listener that reads value still fires once', () {
+      final a = Store(1);
+      final b = Store(2);
+      final sum = Computed(() => a.value + b.value);
+      sum.value; // warm up deps
+      final observed = <int>[];
+      void listener() {
+        observed.add(sum.value);
+      }
+
+      sum.addListener(listener);
+      batch(() {
+        a.value = 10;
+        b.value = 20;
+      });
+      expect(observed, [30]);
+
+      sum.removeListener(listener);
+      a.dispose();
+      b.dispose();
+      sum.dispose();
+    });
+
+    test('computed stream emits once per batch', () async {
+      final a = Store(1);
+      final b = Store(2);
+      final sum = Computed(() => a.value + b.value);
+      sum.value; // warm up deps
+      final emitted = <int>[];
+      final sub = sum.listen(emitted.add);
+      batch(() {
+        a.value = 10;
+        b.value = 20;
+      });
+      await Future<void>.delayed(Duration.zero);
+      expect(emitted, [30]);
+
+      await sub.cancel();
+      a.dispose();
+      b.dispose();
+      sum.dispose();
+    });
+
+    test('diamond dependency listener fires once per batch', () {
+      final source = Store(1);
+      final left = Computed(() => source.value + 1);
+      final right = Computed(() => source.value + 2);
+      final bottom = Computed(() => left.value + right.value);
+      bottom.value; // warm up deps
+      var calls = 0;
+      final observed = <int>[];
+      void listener() {
+        calls++;
+        // Reading the value mid-flush lazily recomputes left/right; that
+        // must not re-schedule another notification (regression guard).
+        observed.add(bottom.value);
+      }
+
+      bottom.addListener(listener);
+      batch(() {
+        source.value = 10;
+      });
+      expect(calls, 1);
+      expect(observed, [23]); // (10+1) + (10+2) = 23
+      expect(bottom.value, 23);
+
+      bottom.removeListener(listener);
+      source.dispose();
+      left.dispose();
+      right.dispose();
+      bottom.dispose();
+    });
+
+    test('chained computeds each notify once per batch', () {
+      final s = Store(1);
+      final c1 = Computed(() => s.value * 2);
+      final c2 = Computed(() => c1.value + 1);
+      c1.value; // warm up
+      c2.value; // warm up
+      var c1Calls = 0;
+      var c2Calls = 0;
+      void c1Listener() => c1Calls++;
+      void c2Listener() => c2Calls++;
+      c1.addListener(c1Listener);
+      c2.addListener(c2Listener);
+
+      batch(() {
+        s.value = 5;
+        s.value = 10;
+      });
+
+      expect(c1Calls, 1);
+      expect(c2Calls, 1);
+      expect(c1.value, 20); // 10 * 2
+      expect(c2.value, 21); // 20 + 1
+
+      c1.removeListener(c1Listener);
+      c2.removeListener(c2Listener);
+      s.dispose();
+      c1.dispose();
+      c2.dispose();
+    });
+
+    test('store listeners unaffected: one call per flushed store', () {
+      final a = Store(1);
+      final b = Store(2);
+      var aCalls = 0;
+      var bCalls = 0;
+      void aListener() => aCalls++;
+      void bListener() => bCalls++;
+      a.addListener(aListener);
+      b.addListener(bListener);
+
+      batch(() {
+        a.value = 10;
+        b.value = 20;
+      });
+
+      expect(aCalls, 1);
+      expect(bCalls, 1);
+
+      a.removeListener(aListener);
+      b.removeListener(bListener);
+      a.dispose();
+      b.dispose();
+    });
+
+    test('non-batch updates still notify per change', () {
+      final a = Store(1);
+      final b = Store(2);
+      final sum = Computed(() => a.value + b.value);
+      sum.value; // warm up deps
+      var calls = 0;
+      final observed = <int>[];
+      void listener() {
+        calls++;
+        observed.add(sum.value);
+      }
+
+      sum.addListener(listener);
+      a.value = 10;
+      b.value = 20;
+      expect(calls, 2);
+      expect(observed, [12, 30]); // intermediate + final
+
+      sum.removeListener(listener);
+      a.dispose();
+      b.dispose();
+      sum.dispose();
+    });
+
+    test('computed first read inside batch defers notification', () {
+      final s = Store(1);
+      final c = Computed(() => s.value * 2);
+      // NO warm-up read — computed starts dirty
+      var calls = 0;
+      c.addListener(() {
+        calls++;
+      });
+
+      batch(() {
+        s.value = 5;
+        final _ = c.value; // read inside batch triggers recompute
+      });
+
+      expect(calls, 1); // deferred to flush, not fired mid-batch
+
+      s.dispose();
+      c.dispose();
+    });
+
+    test('listener exception during flush does not corrupt batch state', () {
+      final s = Store(0);
+      final c = Computed(() => s.value);
+      c.value; // warm up
+
+      void throwingListener() => throw Exception('listener boom');
+      c.addListener(throwingListener);
+
+      expect(
+          () => batch(() {
+                s.value = 42;
+              }),
+          throwsException);
+
+      c.removeListener(throwingListener);
+
+      // System must still be alive after the exception
+      final s2 = Store(0);
+      final c2 = Computed(() => s2.value);
+      c2.value; // warm up
+      var calls = 0;
+      final observed = <int>[];
+      // Reading the value clears the dirty bit, so every subsequent change
+      // produces a fresh notification (dirty computeds coalesce otherwise).
+      void countingListener() {
+        calls++;
+        observed.add(c2.value);
+      }
+
+      c2.addListener(countingListener);
+
+      // Plain non-batch update
+      s2.value = 1;
+      expect(calls, 1);
+      expect(observed, [1]);
+
+      // Batch update
+      batch(() {
+        s2.value = 5;
+      });
+      expect(calls, 2);
+      expect(observed, [1, 5]);
+      expect(c2.value, 5);
+
+      c2.removeListener(countingListener);
+      s.dispose();
+      c.dispose();
+      s2.dispose();
+      c2.dispose();
+    });
+
+    test(
+        'exception from one listener does not prevent later batches from flushing',
+        () {
+      final a = Store(0);
+      final b = Store(0);
+      final ca = Computed(() => a.value);
+      final cb = Computed(() => b.value);
+      ca.value; // warm up
+      cb.value; // warm up
+
+      void throwingListener() => throw Exception('boom from ca');
+      ca.addListener(throwingListener);
+      var cbCalls = 0;
+      void cbListener() => cbCalls++;
+      cb.addListener(cbListener);
+
+      // First batch throws because ca's listener throws
+      expect(
+        () => batch(() {
+          a.value = 1;
+          b.value = 2;
+        }),
+        throwsException,
+      );
+
+      // cb value must reflect the update regardless of flush-order detail
+      expect(cb.value, 2);
+
+      // Remove throwing listener; subsequent batches must work normally
+      ca.removeListener(throwingListener);
+      final prevCbCalls = cbCalls;
+
+      batch(() {
+        a.value = 10;
+        b.value = 20;
+      });
+
+      expect(cbCalls, prevCbCalls + 1);
+      expect(cb.value, 20);
+      expect(ca.value, 10);
+
+      cb.removeListener(cbListener);
+      a.dispose();
+      b.dispose();
+      ca.dispose();
+      cb.dispose();
+    });
+  });
 }

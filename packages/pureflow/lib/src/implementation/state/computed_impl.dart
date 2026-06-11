@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:meta/meta.dart';
+import 'package:pureflow/src/batch.dart';
 import 'package:pureflow/src/common/bit_flags.dart';
 import 'package:pureflow/src/computed.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
@@ -67,8 +68,32 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     if (viewStatus.hasFlag(dirtyBit | viewDisposedBit)) return;
     _viewStatus = viewStatus.setFlag(dirtyBit);
 
+    // During a batch (including the flush phase), defer notification so
+    // listeners fire once per batch instead of once per flushed dependency.
+    if (batchDepth > 0) {
+      _deferToBatch();
+      return;
+    }
+
     // Notify all subscribers (listeners + dependent Computed values)
     notifySubscribers();
+  }
+
+  /// Enqueues this Computed in the batch buffer (at most once per flush).
+  ///
+  /// Mirrors the deferral in `StoreImpl.value=`: the flush loop in
+  /// `_flushBatch` picks up entries appended during the flush, so this
+  /// Computed notifies after all stores of the current batch have settled.
+  @pragma('vm:prefer-inline')
+  void _deferToBatch() {
+    // Already enqueued, or currently delivering notifications (the in-flight
+    // notifySubscribers covers this change — mirrors its re-entrancy guard).
+    if (status.hasFlag(inBatchBit | notifyingBit)) return;
+    status = status.setFlag(inBatchBit);
+    if (batchCount >= batchBuffer.length) {
+      batchBuffer.length *= 2;
+    }
+    batchBuffer[batchCount++] = this;
   }
 
   void _recompute() {
@@ -100,14 +125,13 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
       _viewStatus = _viewStatus.clearFlag(dirtyBit | runningBit);
     }
 
-    final shouldNotify =
-        !_viewStatus.hasFlag(hasValueBit) || !_equals(_value, newValue);
+    final isFirstValue = !_viewStatus.hasFlag(hasValueBit);
+    final shouldNotify = isFirstValue || !_equals(_value, newValue);
 
     // Only notify if value actually changed
     if (shouldNotify) {
       final observer = Pureflow.observer;
-      Object? oldValue;
-      oldValue = _viewStatus.hasFlag(hasValueBit) ? _value : null;
+      final oldValue = isFirstValue ? null : _value as Object?;
 
       _viewStatus = _viewStatus.setFlag(hasValueBit);
       _value = newValue;
@@ -119,7 +143,22 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
         newValue,
       );
 
-      notifySubscribers();
+      // A recompute can happen mid-batch (e.g. the batch action reads this
+      // value, or a listener of an earlier flushed source does). Defer the
+      // notification instead of firing it mid-batch.
+      //
+      // During the flush phase itself the dirty cycle has already enqueued
+      // (or delivered) this Computed's notification, so scheduling another
+      // one would double-fire listeners. The only exception is the very
+      // first materialization of a value: initial dirtyBit is set by the
+      // constructor, not by markDirty, so no announcement exists yet.
+      if (batchDepth > 0) {
+        if (!batchFlushing || isFirstValue) {
+          _deferToBatch();
+        }
+      } else {
+        notifySubscribers();
+      }
     }
   }
 

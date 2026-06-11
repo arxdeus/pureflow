@@ -4,6 +4,13 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 /// Current batch depth for batched updates.
 int batchDepth = 0;
 
+/// Whether the batch buffer is currently being flushed.
+///
+/// During the flush phase every dirty reactive has either already been
+/// enqueued (and will be delivered) or already delivered its notification,
+/// so recompute-driven notifications can be skipped (see ComputedImpl).
+bool batchFlushing = false;
+
 /// Initial batch buffer capacity.
 const int _initialBatchCapacity = 64;
 
@@ -79,31 +86,49 @@ void _flushBatch() {
   // and NOT trigger recursive _flushBatch(). The while loop below
   // picks up these new items automatically.
   batchDepth++;
+  batchFlushing = true;
 
-  var start = 0;
-  while (start < batchCount) {
-    final end = batchCount;
+  var processed = 0;
+  try {
+    while (processed < batchCount) {
+      final end = batchCount;
 
-    for (var i = start; i < end; i++) {
-      final store = batchBuffer[i]!;
-      batchBuffer[i] = null;
-      store.status = store.status.clearFlag(inBatchBit);
-      if (!store.status.hasFlag(disposedBit)) {
-        store.notifySubscribers();
+      for (var i = processed; i < end; i++) {
+        final store = batchBuffer[i]!;
+        batchBuffer[i] = null;
+        store.status = store.status.clearFlag(inBatchBit);
+        if (!store.status.hasFlag(disposedBit)) {
+          store.notifySubscribers();
+        }
+      }
+
+      processed = end;
+    }
+  } finally {
+    // A listener may have thrown mid-flush. Clear inBatchBit on any
+    // unprocessed entries, otherwise they would never re-enqueue and the
+    // global counters below would stay corrupted, deadlocking all future
+    // notifications.
+    for (var i = 0; i < batchCount; i++) {
+      final source = batchBuffer[i];
+      if (source != null) {
+        source.status = source.status.clearFlag(inBatchBit);
+        batchBuffer[i] = null;
       }
     }
 
-    start = end;
-  }
+    batchFlushing = false;
+    batchCount = 0;
+    batchDepth--;
 
-  batchCount = 0;
-  batchDepth--;
-
-  // Shrink buffer if it grew beyond 4x initial (256+) and this flush
-  // used less than 25% of capacity. Replace entire buffer because
-  // Dart VM's _GrowableList doesn't release backing array on .length reduction.
-  final bufferLength = batchBuffer.length;
-  if (bufferLength > _initialBatchCapacity * 4 && start < bufferLength ~/ 4) {
-    batchBuffer = List.filled(_initialBatchCapacity, null, growable: true);
+    // Shrink buffer if it grew beyond 4x initial (256+) and this flush
+    // used less than 25% of capacity. Replace entire buffer because
+    // Dart VM's _GrowableList doesn't release backing array on .length
+    // reduction.
+    final bufferLength = batchBuffer.length;
+    if (bufferLength > _initialBatchCapacity * 4 &&
+        processed < bufferLength ~/ 4) {
+      batchBuffer = List.filled(_initialBatchCapacity, null, growable: true);
+    }
   }
 }
