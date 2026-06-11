@@ -13,7 +13,7 @@ import 'package:pureflow/src/store.dart';
 @internal
 class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   StoreImpl(this._value, {bool Function(T, T)? equality, this.debugLabel})
-      : _equals = equality ?? defaultEquals {
+      : _equals = equality {
     final observer = Pureflow.observer;
     observer?.onCreated?.call(debugLabel, FlowKind.store);
   }
@@ -21,8 +21,13 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
   @override
   final String? debugLabel;
   T _value;
-  bool inBatch = false;
-  final bool Function(T, T) _equals;
+
+  /// Custom equality, or `null` for the default (`identical` || `==`).
+  ///
+  /// Kept nullable on purpose: storing a generic `defaultEquals` tear-off
+  /// would allocate an instantiated closure per Store and force an indirect
+  /// call on every write. The null branch inlines the default comparison.
+  final bool Function(T, T)? _equals;
 
   @override
   @pragma('vm:prefer-inline')
@@ -41,25 +46,21 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
     // Disposed check first (cheap bit operation)
     if (status.hasFlag(disposedBit)) return;
 
-    if (_equals(_value, newValue)) return;
-
-    final observer = Pureflow.observer;
-    final hasObserver =
-        observer != null && observer.onObservableChanged != null;
-
-    late final Object? oldValue;
-    if (hasObserver) {
-      oldValue = _value;
+    // Default equality inlined; custom equality via indirect call.
+    final eq = _equals;
+    if (eq == null
+        ? identical(_value, newValue) || _value == newValue
+        : eq(_value, newValue)) {
+      return;
     }
 
+    final oldValue = _value;
     _value = newValue;
 
-    observer?.onObservableChanged?.call(
-      debugLabel,
-      FlowKind.store,
-      oldValue,
-      newValue,
-    );
+    // Observer plumbing kept out-of-line to keep the common path lean.
+    if (Pureflow.observer != null) {
+      _notifyObserverChanged(oldValue, newValue);
+    }
 
     // Handle batching - defer notification
     if (batchDepth > 0) {
@@ -80,6 +81,16 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
     }
     // Notify all subscribers (listeners + dependencies)
     notifySubscribers();
+  }
+
+  @pragma('vm:never-inline')
+  void _notifyObserverChanged(Object? oldValue, T newValue) {
+    Pureflow.observer?.onObservableChanged?.call(
+      debugLabel,
+      FlowKind.store,
+      oldValue,
+      newValue,
+    );
   }
 
   @override

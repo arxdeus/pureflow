@@ -2,7 +2,6 @@
 // Bit Flags for Status
 // ============================================================================
 
-import 'package:meta/meta.dart';
 import 'package:pureflow/src/internal/state/reactive_source.dart';
 
 /// Bit flags for ReactiveSource status.
@@ -23,7 +22,3 @@ const int hasValueBit = 1 << 3;
 /// Currently evaluating Computed (for dependency tracking).
 /// Using dynamic to avoid circular imports with Computed.
 ReactiveSource<Object?>? currentView;
-
-@internal
-@pragma('vm:prefer-inline')
-bool defaultEquals<T>(T a, T b) => identical(a, b) || a == b;

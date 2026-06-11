@@ -19,7 +19,7 @@ import 'package:pureflow/src/observer.dart';
 @internal
 class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   ComputedImpl(this._compute, {bool Function(T, T)? equality, this.debugLabel})
-      : _equals = equality ?? defaultEquals {
+      : _equals = equality {
     final observer = Pureflow.observer;
     observer?.onCreated?.call(debugLabel, FlowKind.computed);
   }
@@ -27,7 +27,13 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   @override
   final String? debugLabel;
   final T Function() _compute;
-  final bool Function(T, T) _equals;
+
+  /// Custom equality, or `null` for the default (`identical` || `==`).
+  ///
+  /// Kept nullable on purpose: storing a generic `defaultEquals` tear-off
+  /// would allocate an instantiated closure per Computed and force an
+  /// indirect call on every recompute. The null branch inlines the default.
+  final bool Function(T, T)? _equals;
   late T _value;
 
   /// Status flags: bit 0 = dirty, bit 1 = running, bit 2 = disposed, bit 3 = hasValue
@@ -75,6 +81,12 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
       return;
     }
 
+    // Leaf short-circuit: no listeners and no dependent Computed values
+    // means notifySubscribers would only toggle status bits and walk two
+    // empty lists. Skipping it matters in wide fanouts (1000 leaf
+    // computeds per source write in benchmarks).
+    if (!hasListeners) return;
+
     // Notify all subscribers (listeners + dependent Computed values)
     notifySubscribers();
   }
@@ -115,18 +127,30 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     final previousView = currentView;
     currentView = this;
 
+    var succeeded = false;
     late final T newValue;
     try {
       newValue = _compute();
+      succeeded = true;
     } finally {
       currentView = previousView;
-      // Always cleanup dependencies and clear flags, even on error
+      // Always cleanup dependencies and clear runningBit, even on error.
       _cleanupDependencies();
-      _viewStatus = _viewStatus.clearFlag(dirtyBit | runningBit);
+      // Keep dirtyBit set when _compute throws so the next access re-runs
+      // the computation (documented behavior). Clearing it on error would
+      // make the next read skip recompute and hit the uninitialized
+      // `late _value` (LateInitializationError) on first evaluation.
+      _viewStatus = succeeded
+          ? _viewStatus.clearFlag(dirtyBit | runningBit)
+          : _viewStatus.clearFlag(runningBit);
     }
 
     final isFirstValue = !_viewStatus.hasFlag(hasValueBit);
-    final shouldNotify = isFirstValue || !_equals(_value, newValue);
+    final eq = _equals;
+    final shouldNotify = isFirstValue ||
+        !(eq == null
+            ? identical(_value, newValue) || _value == newValue
+            : eq(_value, newValue));
 
     // Only notify if value actually changed
     if (shouldNotify) {

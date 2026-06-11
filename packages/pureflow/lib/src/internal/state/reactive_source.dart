@@ -176,7 +176,7 @@ abstract class ReactiveSource<T> extends Stream<T>
   }
 
   // --------------------------------------------------------------------------
-  // Notification (Optimized - no try-catch, separate loops)
+  // Notification (Optimized - separate loops)
   // --------------------------------------------------------------------------
 
   /// Notifies all subscribers (both listeners and dependencies).
@@ -185,16 +185,21 @@ abstract class ReactiveSource<T> extends Stream<T>
     if (status.hasFlag(notifyingBit)) return;
     status = status.setFlag(notifyingBit);
 
-    // Notify callback listeners
-    for (var node = listeners; node != null; node = node.next) {
-      node.callback();
+    // try/finally is required: without it a throwing listener leaves
+    // notifyingBit set forever and every future notification is silently
+    // dropped. Mirrors the guard in the batch flush path.
+    try {
+      // Notify callback listeners
+      for (var node = listeners; node != null; node = node.next) {
+        node.callback();
+      }
+      // Mark dependent Computed values as dirty
+      for (var node = dependencies; node != null; node = node.next) {
+        node.target.markDirty();
+      }
+    } finally {
+      status = status.clearFlag(notifyingBit);
     }
-    // Mark dependent Computed values as dirty
-    for (var node = dependencies; node != null; node = node.next) {
-      node.target.markDirty();
-    }
-
-    status = status.clearFlag(notifyingBit);
   }
 
   // --------------------------------------------------------------------------
