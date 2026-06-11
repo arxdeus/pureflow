@@ -1,6 +1,5 @@
 import 'package:pureflow/src/common/bit_flags.dart';
-import 'package:pureflow/src/implementation/state/store_impl.dart';
-import 'package:pureflow/src/internal/state/globals.dart';
+import 'package:pureflow/src/internal/state/reactive_source.dart';
 
 /// Current batch depth for batched updates.
 int batchDepth = 0;
@@ -10,7 +9,7 @@ const int _initialBatchCapacity = 64;
 
 /// Pre-allocated batch buffer.
 /// Non-final to allow replacement when shrinking after large batches.
-List<StoreImpl<Object?>?> batchBuffer =
+List<ReactiveSource<Object?>?> batchBuffer =
     List.filled(_initialBatchCapacity, null, growable: true);
 int batchCount = 0;
 
