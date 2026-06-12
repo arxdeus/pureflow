@@ -19,7 +19,7 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  pureflow: ^1.1.0
+  pureflow: ^1.2.0
   flutter:
     sdk: flutter
 
