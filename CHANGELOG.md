@@ -3,6 +3,33 @@
 ---
 ## [1.2.0]
 
+### Documentation
+
+- **(readme)** add real-world example links - ([8671905](https://github.com/arxdeus/pureflow/commit/86719055df7edc9bf80d214b312f339536264f57))
+- **(readme)** update description - ([bbdd56b](https://github.com/arxdeus/pureflow/commit/bbdd56b30e11a8971acf513132e983761c30c296))
+
+### Features
+
+- **(batch)** introduce batch flushing mechanism to optimize notification delivery and prevent double-firing during updates - ([e9ccf6a](https://github.com/arxdeus/pureflow/commit/e9ccf6acd3b1cbce894059c82263bd02659bd436))
+- **(pipeline)** add pipeline transformer helpers - ([5cd24f5](https://github.com/arxdeus/pureflow/commit/5cd24f56b3c28349e0d9286a892049bb2edf0a36))
+- **(pipeline)** handle event cancellation after dispose - ([543a413](https://github.com/arxdeus/pureflow/commit/543a413274906c9012c912f6410aa3c5ddce9dac))
+
+### Miscellaneous Chores
+
+- **(release)** bump version to 1.2.0 and update changelog - ([96601d1](https://github.com/arxdeus/pureflow/commit/96601d1301d233508248c1f4fef6480ba98dbf16))
+
+### Performance
+
+- **(state)** optimize hot paths and fix notification/recompute bugs - ([74a5974](https://github.com/arxdeus/pureflow/commit/74a597430c5bbaad2c4bde46bf7ae532f5cfd836))
+
+### Refactoring
+
+- **(batch)** replace StoreImpl with ReactiveSource in batch buffer - ([42496fc](https://github.com/arxdeus/pureflow/commit/42496fc9c23e8105ceefb1be2634f6b27603b4dd))
+- remove unused equality and listener node implementations - ([c10d69b](https://github.com/arxdeus/pureflow/commit/c10d69b5d4d8bac8fcaea825f5e99476ece92e0b))
+
+---
+## [1.2.0]
+
 ### Bug Fixes
 
 - **(observer)** docs corrected: observer callback exceptions propagate to call sites (`value` setter, constructor, `run()`); observers must not throw
