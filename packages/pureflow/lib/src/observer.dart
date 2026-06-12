@@ -26,8 +26,9 @@ enum FlowKind {
 /// Computed triggers, etc.) from within callbacks. Doing so may cause re-entrant
 /// notifications and unpredictable behavior.
 ///
-/// Observer callbacks are wrapped in try-catch internally - if a callback throws,
-/// the error is silently swallowed to protect the reactive system.
+/// **Exception propagation:** Observer callback exceptions propagate to the call
+/// site (e.g. the `value` setter, constructor, or `run()`). Observers must not
+/// throw; guard any fallible logic within the callback itself.
 ///
 /// ## Example
 ///

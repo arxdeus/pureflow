@@ -53,12 +53,21 @@ abstract class ReactiveSource<T> extends Stream<T>
   @pragma('vm:prefer-inline')
   ListenerNode addListener(VoidCallback listener) {
     final node = ListenerNode(listener);
+    addListenerNode(node);
+    return node;
+  }
+
+  /// Links a pre-built [node] at the head of the listener list.
+  ///
+  /// Used by [ReactiveSubscription], which is itself a [ListenerNode].
+  @override
+  @pragma('vm:prefer-inline')
+  void addListenerNode(ListenerNode node) {
     node.next = listeners;
     if (listeners != null) {
       listeners!.prev = node;
     }
     listeners = node;
-    return node;
   }
 
   @override
@@ -226,7 +235,20 @@ abstract class ReactiveSource<T> extends Stream<T>
   void dispose() {
     // Inline bit check
     if (status.hasFlag(disposedBit)) return;
+    // Set disposedBit BEFORE walking to guard against reentry.
     status = status.setFlag(disposedBit);
+
+    // Notify stream subscriptions that the source is gone. Subscriptions
+    // are the only ListenerNode subtype that needs a dispose signal.
+    var node = listeners;
+    while (node != null) {
+      final next = node.next; // snapshot before callback — it may mutate list
+      if (node is ReactiveSubscription) {
+        node.onSourceDisposed();
+      }
+      node = next;
+    }
+
     listeners = null;
     dependencies = null;
     trackingNode = null;

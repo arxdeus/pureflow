@@ -1,6 +1,15 @@
 # Changelog
 
 ---
+## [1.2.0]
+
+### Bug Fixes
+
+- **(observer)** docs corrected: observer callback exceptions propagate to call sites (`value` setter, constructor, `run()`); observers must not throw
+- **(state)** `dispose()` on a `Store`/`Computed` now fires `onDone` on all live stream subscriptions and completes pending `asFuture()` calls, per the Dart `Stream` contract
+- **(state)** `StreamSubscription.pause()` is now counted — `resume()` must be called once per `pause()` before delivery resumes, per the `StreamSubscription` contract
+
+---
 ## [1.1.0]
 
 ### Bug Fixes

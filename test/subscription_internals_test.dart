@@ -51,20 +51,24 @@ void main() {
       s.dispose();
     });
 
-    test('A2: multiple pause() calls, single resume() unpauses (no counter)',
+    test('A2: multiple pause() calls need matching resume() calls (counted)',
         () {
       final s = Store(0);
       final received = <int>[];
       final sub = s.listen(received.add);
 
       sub.pause();
-      sub.pause(); // second pause — no counter, still one resume needed
+      sub.pause(); // second pause — counter = 2
       s.value = 1;
       expect(received, isEmpty);
 
-      sub.resume(); // single resume unpauses regardless of pause count
+      sub.resume(); // counter = 1, still paused
       s.value = 2;
-      expect(received, [2], reason: 'single resume sufficient');
+      expect(received, isEmpty, reason: 'still paused after single resume');
+
+      sub.resume(); // counter = 0, now unpaused
+      s.value = 3;
+      expect(received, [3], reason: 'delivery resumes after second resume');
 
       sub.cancel();
       s.dispose();
@@ -138,19 +142,19 @@ void main() {
       s.dispose();
     });
 
-    test('A5: dispose after asFuture() set up — onDone never fires (no notify)',
+    test('A5: dispose after asFuture() set up — onDone fires, asFuture completes',
         () async {
-      // ReactiveSource.dispose() nulls listeners without iterating —
-      // subscriptions get NO notification on source dispose.
+      // ReactiveSource.dispose() walks listeners and calls onDispose on each —
+      // subscriptions ARE notified on source dispose.
       final s = Store(0);
       final sub = s.listen(null);
       var completed = false;
       unawaited(sub.asFuture<void>().then((_) => completed = true));
-      s.dispose(); // does NOT call _onSourceDisposed on existing subscriptions
+      s.dispose(); // calls _onSourceDisposed on all active subscriptions
       await Future<void>.delayed(Duration.zero);
-      expect(completed, isFalse,
-          reason: 'dispose does not notify existing subscriptions');
-      unawaited(sub.cancel());
+      expect(completed, isTrue,
+          reason: 'dispose notifies subscriptions via onDispose');
+      await sub.cancel();
     });
 
     // A6: onData handler replacement
@@ -242,25 +246,19 @@ void main() {
     });
 
     test(
-        'A8: dispose fires onDone on remaining active subscriptions via cancel',
+        'A8: dispose fires onDone on all remaining active subscriptions',
         () {
-      // Note: ReactiveSource.dispose() does NOT iterate listeners to call
-      // _onSourceDisposed. Only cancel() fires onDone. This test verifies
-      // dispose does not crash even with active subscriptions.
+      // ReactiveSource.dispose() iterates listeners and calls onDispose on each,
+      // which fires _onSourceDisposed → onDone on every live subscription.
       final s = Store(0);
       var doneA = 0;
       var doneB = 0;
-      final subA = s.listen(null, onDone: () => doneA++);
-      final subB = s.listen(null, onDone: () => doneB++);
+      s.listen(null, onDone: () => doneA++);
+      s.listen(null, onDone: () => doneB++);
 
       s.dispose();
-      // dispose does not notify subscriptions
-      expect(doneA, 0);
-      expect(doneB, 0);
-
-      // manual cancel still works after dispose (source.removeListenerNode safe)
-      expect(subA.cancel, returnsNormally);
-      expect(subB.cancel, returnsNormally);
+      expect(doneA, 1, reason: 'subA onDone fired by dispose');
+      expect(doneB, 1, reason: 'subB onDone fired by dispose');
     });
 
     // A9: subscription created inside another subscription's onData

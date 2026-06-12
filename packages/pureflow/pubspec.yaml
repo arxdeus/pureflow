@@ -1,6 +1,6 @@
 name: pureflow
 description: A Pipeline-first reactive state toolkit for Dart.
-version: 1.1.0
+version: 1.2.0
 repository: https://github.com/arxdeus/pureflow
 homepage: https://github.com/arxdeus/pureflow
 issue_tracker: https://github.com/arxdeus/pureflow/issues

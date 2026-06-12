@@ -523,21 +523,21 @@ void main() {
     });
 
     test(
-        'onObservableChanged throwing propagates from store value setter (actual impl: no try-catch)',
+        'onObservableChanged throwing propagates to caller (value setter)',
         () {
       Pureflow.observer = FlowObserver(
         onObservableChanged: (_, __, ___, ____) => throw StateError('obs boom'),
       );
       final s = Store(0);
 
-      // Observer is called directly (no try-catch in store_impl), so it propagates
+      // Exception propagates to the value setter call site
       expect(() => s.value = 1, throwsStateError);
 
       s.dispose();
     });
 
     test(
-        'onCreated throwing propagates from Store constructor (actual impl: no try-catch)',
+        'onCreated throwing propagates to caller (Store constructor)',
         () {
       Pureflow.observer = FlowObserver(
         onCreated: (_, __) => throw StateError('created boom'),
@@ -547,7 +547,7 @@ void main() {
     });
 
     test(
-        'onCreated throwing propagates from Computed constructor (actual impl: no try-catch)',
+        'onCreated throwing propagates to caller (Computed constructor)',
         () {
       Pureflow.observer = FlowObserver(
         onCreated: (_, __) => throw StateError('computed created boom'),

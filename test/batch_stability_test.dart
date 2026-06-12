@@ -107,16 +107,18 @@ void main() {
     });
 
     test('batch returns Future without awaiting — future is the return value',
-        () {
+        () async {
       final s = Store(0);
       // Async action returns a Future<void>. batch() does not await it.
       final future = batch(() {
         s.value = 1;
+        return Future<void>.value();
       });
       // batch itself returns the Future
       expect(future, isA<Future<void>>());
       // Sync mutations (before first await) are visible immediately after batch
       expect(s.value, 1);
+      await future;
       s.dispose();
     });
 

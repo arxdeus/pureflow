@@ -6,19 +6,19 @@ This document contains performance comparison results between Pureflow and other
 
 | Feature | [Pureflow](https://pub.dev/packages/pureflow) | [Bloc](https://pub.dev/packages/bloc) | [Riverpod](https://pub.dev/packages/riverpod) | [Signals](https://pub.dev/packages/signals_core) | [AlienSignals](https://pub.dev/packages/alien_signals) | [MobX](https://pub.dev/packages/mobx) | [ValueNotifier](https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html) | 
 |---------|---|---|---|---|---|---|---|
-| State Holder: Create | 0.76 us | 0.77 us | 7.72 us | 5.17 us | 0.82 us | 3.89 us | 0.75 us | 
-| State Holder: Read | 0.02 us | 0.04 us | 0.24 us | 0.07 us | 0.07 us | 0.04 us | 0.04 us | 
-| State Holder: Write | 0.05 us | 0.16 us | 1.25 us | 2.09 us | 0.05 us | 2.46 us | 0.07 us | 
-| State Holder: Notify | 0.12 us | 0.61 us | 1.63 us | 2.53 us | 0.46 us | 8.85 us | 0.13 us | 
-| State Holder: Notify - Many Dependents (1000) | 38.73 us | 54.17 us | 243.80 us | 372.29 us | 268.54 us | 5857.73 us | 32.88 us | 
-| State Holder: Subscribe | — | 1.15 us | — | — | — | — | — | 
+| State Holder: Create | 0.92 us | 0.51 us | 6.73 us | 1.02 us | 0.86 us | 3.80 us | 0.90 us | 
+| State Holder: Read | 0.02 us | 0.01 us | 0.24 us | 0.04 us | 0.03 us | 0.06 us | 0.01 us | 
+| State Holder: Write | 0.04 us | 0.11 us | 1.13 us | 0.36 us | 0.05 us | 2.29 us | 0.03 us | 
+| State Holder: Notify | 0.11 us | 0.56 us | 1.38 us | 0.65 us | 0.28 us | 8.89 us | 0.05 us | 
+| State Holder: Notify - Many Dependents (1000) | 28.03 us | 43.54 us | 122.68 us | 318.47 us | 194.55 us | 5897.09 us | 17.10 us | 
+| State Holder: Subscribe | — | 1.54 us | — | — | — | — | — | 
 | State Holder: Unsubscribe | — | 0.04 us | — | — | — | — | — | 
-| Recomputable View: Create | 1.05 us | — | 12.67 us | 7.85 us | 1.03 us | 4.86 us | 3.04 us | 
-| Recomputable View: Read | 0.04 us | — | 0.25 us | 0.10 us | 0.07 us | 0.48 us | 0.04 us | 
-| Recomputable View: Recompute | 0.24 us | — | 3.46 us | 4.08 us | 0.46 us | 3.37 us | 0.17 us | 
-| Recomputable View: Chain | 0.45 us | — | 6.65 us | 6.21 us | 0.79 us | 4.76 us | 0.25 us | 
-| Recomputable View: Chain - Many Dependents (1000) | 210.12 us | — | 3168.51 us | 1876.05 us | 271.85 us | 312.31 us | 98.71 us | 
-| Async Concurrency: Sequential | 4.58 us | 4.94 us | — | — | — | — | — | 
+| Recomputable View: Create | 1.23 us | — | 11.65 us | 1.99 us | 0.95 us | 5.58 us | 2.47 us | 
+| Recomputable View: Read | 0.02 us | — | 0.24 us | 0.07 us | 0.04 us | 0.31 us | 0.01 us | 
+| Recomputable View: Recompute | 0.21 us | — | 3.49 us | 0.59 us | 0.27 us | 2.75 us | 0.15 us | 
+| Recomputable View: Chain | 0.41 us | — | 5.86 us | 0.80 us | 0.48 us | 5.70 us | 0.23 us | 
+| Recomputable View: Chain - Many Dependents (1000) | 187.31 us | — | 2517.03 us | 240.63 us | 186.20 us | 347.84 us | 104.96 us | 
+| Async Concurrency: Sequential | 4.37 us | 4.72 us | — | — | — | — | — | 
 
 ## Performance Comparison (vs Pureflow)
 
@@ -26,19 +26,19 @@ This table shows the percentage difference from Pureflow for each metric.
 
 | Feature | [Bloc](https://pub.dev/packages/bloc) | [Riverpod](https://pub.dev/packages/riverpod) | [Signals](https://pub.dev/packages/signals_core) | [AlienSignals](https://pub.dev/packages/alien_signals) | [MobX](https://pub.dev/packages/mobx) | [ValueNotifier](https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html) | 
 |---------|---|---|---|---|---|---|
-| State Holder: Create | 2.5% | 922.3% | 583.7% | 9.2% | 414.4% | -1.4% | 
-| State Holder: Read | 92.2% | 1103.8% | 272.0% | 253.7% | 112.9% | 100.6% | 
-| State Holder: Write | 234.6% | 2494.4% | 4242.6% | -0.6% | 5008.4% | 42.0% | 
-| State Holder: Notify | 400.6% | 1234.3% | 1968.1% | 273.7% | 7137.2% | 5.1% | 
-| State Holder: Notify - Many Dependents (1000) | 39.9% | 529.4% | 861.2% | 593.3% | 15023.4% | -15.1% | 
+| State Holder: Create | -44.3% | 630.1% | 10.9% | -6.9% | 312.0% | -2.8% | 
+| State Holder: Read | -42.1% | 878.9% | 45.8% | 32.1% | 143.0% | -42.7% | 
+| State Holder: Write | 214.8% | 3074.8% | 905.6% | 34.8% | 6345.2% | -8.6% | 
+| State Holder: Notify | 431.3% | 1204.2% | 512.1% | 163.7% | 8267.3% | -49.1% | 
+| State Holder: Notify - Many Dependents (1000) | 55.3% | 337.7% | 1036.3% | 594.2% | 20940.9% | -39.0% | 
 | State Holder: Subscribe | — | — | — | — | — | — | 
 | State Holder: Unsubscribe | — | — | — | — | — | — | 
-| Recomputable View: Create | — | 1101.2% | 645.0% | -2.0% | 360.8% | 188.6% | 
-| Recomputable View: Read | — | 469.0% | 139.5% | 68.2% | 1001.6% | -7.5% | 
-| Recomputable View: Recompute | — | 1358.9% | 1619.0% | 93.8% | 1318.1% | -28.5% | 
-| Recomputable View: Chain | — | 1389.6% | 1292.1% | 76.7% | 966.6% | -44.5% | 
-| Recomputable View: Chain - Many Dependents (1000) | — | 1408.0% | 792.9% | 29.4% | 48.6% | -53.0% | 
-| Async Concurrency: Sequential | 7.8% | — | — | — | — | — | 
+| Recomputable View: Create | — | 849.9% | 62.2% | -22.5% | 355.2% | 101.8% | 
+| Recomputable View: Read | — | 850.8% | 170.3% | 41.6% | 1162.1% | -42.6% | 
+| Recomputable View: Recompute | — | 1587.1% | 186.3% | 28.3% | 1229.1% | -27.6% | 
+| Recomputable View: Chain | — | 1321.7% | 94.4% | 16.3% | 1283.9% | -44.2% | 
+| Recomputable View: Chain - Many Dependents (1000) | — | 1243.8% | 28.5% | -0.6% | 85.7% | -44.0% | 
+| Async Concurrency: Sequential | 8.1% | — | — | — | — | — | 
 
 ## Detailed Results
 
@@ -46,105 +46,105 @@ This table shows the percentage difference from Pureflow for each metric.
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Computed.chain | 0.45 |
-| Computed.chain.many_dependents | 210.12 |
-| Computed.create | 1.05 |
-| Computed.read | 0.04 |
-| Computed.recompute | 0.24 |
-| Pipeline.sequential | 4.58 |
-| Store.create | 0.76 |
-| Store.notify | 0.12 |
-| Store.notify.many_dependents | 38.73 |
+| Computed.chain | 0.41 |
+| Computed.chain.many_dependents | 187.31 |
+| Computed.create | 1.23 |
+| Computed.read | 0.02 |
+| Computed.recompute | 0.21 |
+| Pipeline.sequential | 4.37 |
+| Store.create | 0.92 |
+| Store.notify | 0.11 |
+| Store.notify.many_dependents | 28.03 |
 | Store.read | 0.02 |
-| Store.write | 0.05 |
+| Store.write | 0.04 |
 
 ### Bloc
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Cubit.create | 0.77 |
-| Cubit.notify | 0.61 |
-| Cubit.notify.many_dependents | 54.17 |
-| Cubit.read | 0.04 |
-| Cubit.subscribe | 1.15 |
+| Cubit.create | 0.51 |
+| Cubit.notify | 0.56 |
+| Cubit.notify.many_dependents | 43.54 |
+| Cubit.read | 0.01 |
+| Cubit.subscribe | 1.54 |
 | Cubit.unsubscribe | 0.04 |
-| Cubit.write | 0.16 |
-| Sequential | 4.94 |
+| Cubit.write | 0.11 |
+| Sequential | 4.72 |
 
 ### Riverpod
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Computed.chain | 6.65 |
-| Computed.chain.many_dependents | 3168.51 |
-| Computed.create | 12.67 |
-| Computed.read | 0.25 |
-| Computed.recompute | 3.46 |
-| StateProvider.create | 7.72 |
-| StateProvider.notify | 1.63 |
-| StateProvider.notify.many_dependents | 243.80 |
+| Computed.chain | 5.86 |
+| Computed.chain.many_dependents | 2517.03 |
+| Computed.create | 11.65 |
+| Computed.read | 0.24 |
+| Computed.recompute | 3.49 |
+| StateProvider.create | 6.73 |
+| StateProvider.notify | 1.38 |
+| StateProvider.notify.many_dependents | 122.68 |
 | StateProvider.read | 0.24 |
-| StateProvider.write | 1.25 |
+| StateProvider.write | 1.13 |
 
 ### Signals
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Computed.chain | 6.21 |
-| Computed.chain.many_dependents | 1876.05 |
-| Computed.create | 7.85 |
-| Computed.read | 0.10 |
-| Computed.recompute | 4.08 |
-| Signal.create | 5.17 |
-| Signal.notify | 2.53 |
-| Signal.notify.many_dependents | 372.29 |
-| Signal.read | 0.07 |
-| Signal.write | 2.09 |
+| Computed.chain | 0.80 |
+| Computed.chain.many_dependents | 240.63 |
+| Computed.create | 1.99 |
+| Computed.read | 0.07 |
+| Computed.recompute | 0.59 |
+| Signal.create | 1.02 |
+| Signal.notify | 0.65 |
+| Signal.notify.many_dependents | 318.47 |
+| Signal.read | 0.04 |
+| Signal.write | 0.36 |
 
 ### AlienSignals
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Computed.chain | 0.79 |
-| Computed.chain.many_dependents | 271.85 |
-| Computed.create | 1.03 |
-| Computed.read | 0.07 |
-| Computed.recompute | 0.46 |
-| Signal.create | 0.82 |
-| Signal.notify | 0.46 |
-| Signal.notify.many_dependents | 268.54 |
-| Signal.read | 0.07 |
+| Computed.chain | 0.48 |
+| Computed.chain.many_dependents | 186.20 |
+| Computed.create | 0.95 |
+| Computed.read | 0.04 |
+| Computed.recompute | 0.27 |
+| Signal.create | 0.86 |
+| Signal.notify | 0.28 |
+| Signal.notify.many_dependents | 194.55 |
+| Signal.read | 0.03 |
 | Signal.write | 0.05 |
 
 ### MobX
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Computed.chain | 4.76 |
-| Computed.chain.many_dependents | 312.31 |
-| Computed.create | 4.86 |
-| Computed.read | 0.48 |
-| Computed.recompute | 3.37 |
-| Observable.create | 3.89 |
-| Observable.notify | 8.85 |
-| Observable.notify.many_dependents | 5857.73 |
-| Observable.read | 0.04 |
-| Observable.write | 2.46 |
+| Computed.chain | 5.70 |
+| Computed.chain.many_dependents | 347.84 |
+| Computed.create | 5.58 |
+| Computed.read | 0.31 |
+| Computed.recompute | 2.75 |
+| Observable.create | 3.80 |
+| Observable.notify | 8.89 |
+| Observable.notify.many_dependents | 5897.09 |
+| Observable.read | 0.06 |
+| Observable.write | 2.29 |
 
 ### ValueNotifier
 
 | Benchmark | Time (μs) |
 |-----------|-----------|
-| Computed.chain | 0.25 |
-| Computed.chain.many_dependents | 98.71 |
-| Computed.create | 3.04 |
-| Computed.read | 0.04 |
-| Computed.recompute | 0.17 |
-| ValueNotifier.create | 0.75 |
-| ValueNotifier.notify | 0.13 |
-| ValueNotifier.notify.many_dependents | 32.88 |
-| ValueNotifier.read | 0.04 |
-| ValueNotifier.write | 0.07 |
+| Computed.chain | 0.23 |
+| Computed.chain.many_dependents | 104.96 |
+| Computed.create | 2.47 |
+| Computed.read | 0.01 |
+| Computed.recompute | 0.15 |
+| ValueNotifier.create | 0.90 |
+| ValueNotifier.notify | 0.05 |
+| ValueNotifier.notify.many_dependents | 17.10 |
+| ValueNotifier.read | 0.01 |
+| ValueNotifier.write | 0.03 |
 
 ---
 

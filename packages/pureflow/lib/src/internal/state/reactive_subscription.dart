@@ -13,6 +13,7 @@ abstract interface class ReactiveSourceLike<T> {
   T get value;
   int get status;
   ListenerNode addListener(VoidCallback listener);
+  void addListenerNode(ListenerNode node);
   void removeListenerNode(ListenerNode node);
 }
 
@@ -22,37 +23,48 @@ abstract interface class ReactiveSourceLike<T> {
 
 /// A lightweight [StreamSubscription] implementation that wraps a
 /// reactive source listener without using [StreamController].
+///
+/// Extends [ListenerNode] so the subscription itself is the node in the
+/// source's listener list: no extra node allocation per `listen()`, and
+/// `ReactiveSource.dispose` can notify subscriptions with a plain type
+/// check instead of carrying a dispose hook on every [ListenerNode].
 @internal
-class ReactiveSubscription<T> implements StreamSubscription<T> {
+class ReactiveSubscription<T> extends ListenerNode
+    implements StreamSubscription<T> {
   ReactiveSubscription(
     this._source,
     void Function(T)? onData,
     void Function()? onDone,
   )   : _onData = onData,
-        _onDone = onDone {
+        _onDone = onDone,
+        super(_noop) {
     // Check if source is already disposed - inline
     if (_source.status.hasFlag(disposedBit)) {
-      _onSourceDisposed();
+      onSourceDisposed();
       return;
     }
 
-    _listenerNode = _source.addListener(() {
-      if (!_isCanceled && _onData != null && !_isPaused) {
-        _onData!(_source.value);
-      }
-    });
+    callback = _handleData;
+    _source.addListenerNode(this);
   }
+
+  static void _noop() {}
 
   final ReactiveSourceLike<T> _source;
   void Function(T)? _onData;
   void Function()? _onDone;
 
-  late final ListenerNode _listenerNode;
   bool _isCanceled = false;
-  bool _isPaused = false;
+  int _pauseCount = 0;
+
+  void _handleData() {
+    if (!_isCanceled && _onData != null && _pauseCount == 0) {
+      _onData!(_source.value);
+    }
+  }
 
   /// Called by the source when it is disposed.
-  void _onSourceDisposed() {
+  void onSourceDisposed() {
     if (_isCanceled) return;
     _isCanceled = true;
     _onDone?.call();
@@ -64,7 +76,7 @@ class ReactiveSubscription<T> implements StreamSubscription<T> {
   Future<void> cancel() {
     if (!_isCanceled) {
       _isCanceled = true;
-      _source.removeListenerNode(_listenerNode);
+      _source.removeListenerNode(this);
       _onDone?.call();
     }
     return const SynchronousFuture<void>(null);
@@ -85,15 +97,17 @@ class ReactiveSubscription<T> implements StreamSubscription<T> {
 
   @override
   void pause([Future<void>? resumeSignal]) {
-    _isPaused = true;
+    _pauseCount++;
     resumeSignal?.then((_) => resume());
   }
 
   @override
-  void resume() => _isPaused = false;
+  void resume() {
+    if (_pauseCount > 0) _pauseCount--;
+  }
 
   @override
-  bool get isPaused => _isPaused;
+  bool get isPaused => _pauseCount > 0;
 
   @override
   Future<E> asFuture<E>([E? futureValue]) {
