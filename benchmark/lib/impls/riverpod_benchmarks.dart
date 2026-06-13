@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field, invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
+// ignore_for_file: unused_field, use_setters_to_change_properties
 
 import 'dart:async';
 
@@ -7,10 +7,31 @@ import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:riverpod/riverpod.dart' as rp;
 
 // ============================================================================
+// Shared Notifier
+// ============================================================================
+
+/// Minimal int [rp.Notifier] used as the modern replacement for the removed
+/// `StateProvider`. The initial value is injected via the constructor so each
+/// provider declaration can seed its own starting state.
+class IntNotifier extends rp.Notifier<int> {
+  IntNotifier(this._initial);
+
+  final int _initial;
+
+  @override
+  int build() => _initial;
+
+  void set(int value) => state = value;
+}
+
+rp.NotifierProvider<IntNotifier, int> intProvider(int initial) =>
+    rp.NotifierProvider<IntNotifier, int>(() => IntNotifier(initial));
+
+// ============================================================================
 // State Holder Benchmarks
 // ============================================================================
 
-/// Measures the cost of creating and initializing a StateProvider.
+/// Measures the cost of creating and initializing a NotifierProvider.
 /// Riverpod requires a ProviderContainer for any provider usage, and a single
 /// container accumulates unbounded state across iterations (causing hangs).
 /// Therefore the full container lifecycle (create → read → dispose) is
@@ -24,7 +45,7 @@ class RiverpodStateProviderCreateBenchmark extends BenchmarkBase {
   @override
   void run() {
     final container = rp.ProviderContainer();
-    final provider = rp.StateProvider<int>((ref) => 42);
+    final provider = intProvider(42);
     container.read(provider);
     container.dispose();
   }
@@ -35,7 +56,7 @@ class RiverpodStateProviderCreateBenchmark extends BenchmarkBase {
 /// access. This indirection is inherent to Riverpod's architecture.
 class RiverpodStateProviderReadBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> provider;
+  late final rp.NotifierProvider<IntNotifier, int> provider;
   int _result = 0;
 
   RiverpodStateProviderReadBenchmark({ScoreEmitter? emitter})
@@ -45,7 +66,7 @@ class RiverpodStateProviderReadBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    provider = rp.StateProvider<int>((ref) => 42);
+    provider = intProvider(42);
   }
 
   @override
@@ -59,12 +80,12 @@ class RiverpodStateProviderReadBenchmark extends BenchmarkBase {
   }
 }
 
-/// Note: Riverpod writes go through `container.read(provider.notifier).state =`
+/// Note: Riverpod writes go through `container.read(provider.notifier).set(..)`
 /// which is two indirections (container lookup + notifier access) vs a direct
 /// assignment in other libraries.
 class RiverpodStateProviderWriteBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> provider;
+  late final rp.NotifierProvider<IntNotifier, int> provider;
   int _counter = 0;
 
   RiverpodStateProviderWriteBenchmark({ScoreEmitter? emitter})
@@ -74,12 +95,12 @@ class RiverpodStateProviderWriteBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    provider = rp.StateProvider<int>((ref) => 0);
+    provider = intProvider(0);
   }
 
   @override
   void run() {
-    container.read(provider.notifier).state = ++_counter;
+    container.read(provider.notifier).set(++_counter);
   }
 
   @override
@@ -90,7 +111,7 @@ class RiverpodStateProviderWriteBenchmark extends BenchmarkBase {
 
 class RiverpodStateProviderNotifyBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> provider;
+  late final rp.NotifierProvider<IntNotifier, int> provider;
   int _counter = 0;
   int _lastValue = 0;
   late final rp.ProviderSubscription<int> subscription;
@@ -102,15 +123,15 @@ class RiverpodStateProviderNotifyBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    provider = rp.StateProvider<int>((ref) => 0);
-    subscription = container.listen(provider, (previous, next) {
+    provider = intProvider(0);
+    subscription = container.listen<int>(provider, (previous, next) {
       _lastValue = next;
     });
   }
 
   @override
   void run() {
-    container.read(provider.notifier).state = ++_counter;
+    container.read(provider.notifier).set(++_counter);
   }
 
   @override
@@ -122,7 +143,7 @@ class RiverpodStateProviderNotifyBenchmark extends BenchmarkBase {
 
 class RiverpodStateProviderNotifyManyDependentsBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> provider;
+  late final rp.NotifierProvider<IntNotifier, int> provider;
   final List<rp.ProviderSubscription<int>> _subscriptions = [];
   int _counter = 0;
 
@@ -133,9 +154,9 @@ class RiverpodStateProviderNotifyManyDependentsBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    provider = rp.StateProvider<int>((ref) => 0);
+    provider = intProvider(0);
     for (var i = 0; i < 1000; i++) {
-      final subscription = container.listen(provider, (previous, next) {
+      final subscription = container.listen<int>(provider, (previous, next) {
         final _ = next;
       });
       _subscriptions.add(subscription);
@@ -144,7 +165,7 @@ class RiverpodStateProviderNotifyManyDependentsBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    container.read(provider.notifier).state = ++_counter;
+    container.read(provider.notifier).set(++_counter);
   }
 
   @override
@@ -174,7 +195,7 @@ class RiverpodComputedCreateBenchmark extends BenchmarkBase {
   @override
   void run() {
     final container = rp.ProviderContainer();
-    final baseProvider = rp.StateProvider<int>((ref) => 42);
+    final baseProvider = intProvider(42);
     final computedProvider =
         rp.Provider<int>((ref) => ref.watch(baseProvider) * 2);
     container.read(computedProvider);
@@ -184,7 +205,7 @@ class RiverpodComputedCreateBenchmark extends BenchmarkBase {
 
 class RiverpodComputedReadBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> baseProvider;
+  late final rp.NotifierProvider<IntNotifier, int> baseProvider;
   late final rp.Provider<int> computedProvider;
   int _result = 0;
 
@@ -195,7 +216,7 @@ class RiverpodComputedReadBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    baseProvider = rp.StateProvider<int>((ref) => 42);
+    baseProvider = intProvider(42);
     computedProvider = rp.Provider<int>((ref) {
       return ref.watch(baseProvider) * 2;
     });
@@ -214,7 +235,7 @@ class RiverpodComputedReadBenchmark extends BenchmarkBase {
 
 class RiverpodComputedRecomputeBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> baseProvider;
+  late final rp.NotifierProvider<IntNotifier, int> baseProvider;
   late final rp.Provider<int> computedProvider;
   int _counter = 0;
   int _result = 0;
@@ -226,7 +247,7 @@ class RiverpodComputedRecomputeBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    baseProvider = rp.StateProvider<int>((ref) => 0);
+    baseProvider = intProvider(0);
     computedProvider = rp.Provider<int>((ref) {
       return ref.watch(baseProvider) * 2;
     });
@@ -234,7 +255,7 @@ class RiverpodComputedRecomputeBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    container.read(baseProvider.notifier).state = ++_counter;
+    container.read(baseProvider.notifier).set(++_counter);
     _result = container.read(computedProvider);
   }
 
@@ -246,7 +267,7 @@ class RiverpodComputedRecomputeBenchmark extends BenchmarkBase {
 
 class RiverpodComputedChainBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> baseProvider;
+  late final rp.NotifierProvider<IntNotifier, int> baseProvider;
   late final rp.Provider<int> doubledProvider;
   late final rp.Provider<int> sumProvider;
   int _counter = 0;
@@ -259,7 +280,7 @@ class RiverpodComputedChainBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    baseProvider = rp.StateProvider<int>((ref) => 0);
+    baseProvider = intProvider(0);
     doubledProvider = rp.Provider<int>((ref) {
       return ref.watch(baseProvider) * 2;
     });
@@ -270,7 +291,7 @@ class RiverpodComputedChainBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    container.read(baseProvider.notifier).state = ++_counter;
+    container.read(baseProvider.notifier).set(++_counter);
     _result = container.read(sumProvider);
   }
 
@@ -282,7 +303,7 @@ class RiverpodComputedChainBenchmark extends BenchmarkBase {
 
 class RiverpodComputedChainManyDependentsBenchmark extends BenchmarkBase {
   late final rp.ProviderContainer container;
-  late final rp.StateProvider<int> baseProvider;
+  late final rp.NotifierProvider<IntNotifier, int> baseProvider;
   final List<rp.Provider<int>> _computedProviders = [];
   int _counter = 0;
 
@@ -293,7 +314,7 @@ class RiverpodComputedChainManyDependentsBenchmark extends BenchmarkBase {
   @override
   void setup() {
     container = rp.ProviderContainer();
-    baseProvider = rp.StateProvider<int>((ref) => 0);
+    baseProvider = intProvider(0);
     for (var i = 0; i < 1000; i++) {
       final computedProvider = rp.Provider<int>((ref) {
         return ref.watch(baseProvider) * 2;
@@ -304,7 +325,7 @@ class RiverpodComputedChainManyDependentsBenchmark extends BenchmarkBase {
 
   @override
   void run() {
-    container.read(baseProvider.notifier).state = ++_counter;
+    container.read(baseProvider.notifier).set(++_counter);
     // Access all computed providers to trigger recomputation
     for (final computedProvider in _computedProviders) {
       final _ = container.read(computedProvider);
