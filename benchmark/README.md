@@ -11,8 +11,6 @@ This document contains performance comparison results between Pureflow and other
 | State Holder: Write | 0.10 us | 0.16 us | 1.24 us | 2.17 us | 0.05 us | 2.52 us | 0.06 us | 
 | State Holder: Notify | 0.16 us | 0.65 us | 1.65 us | 2.58 us | 0.45 us | 9.14 us | 0.13 us | 
 | State Holder: Notify - Many Dependents (1000) | 39.56 us | 55.27 us | 182.62 us | 385.27 us | 273.26 us | 6020.22 us | 31.73 us | 
-| State Holder: Subscribe | — | 1.27 us | — | — | — | — | — | 
-| State Holder: Unsubscribe | — | 0.05 us | — | — | — | — | — | 
 | Recomputable View: Create | 2.34 us | — | 13.06 us | 9.17 us | 0.96 us | 4.48 us | 2.68 us | 
 | Recomputable View: Read | 0.04 us | — | 0.25 us | 0.10 us | 0.07 us | 0.49 us | 0.04 us | 
 | Recomputable View: Recompute | 0.33 us | — | 3.58 us | 4.30 us | 0.48 us | 3.36 us | 0.18 us | 
@@ -93,8 +91,6 @@ This table shows the percentage difference from Pureflow for each metric.
 | State Holder: Write | 72.7% | 1206.1% | 2177.3% | -50.6% | 2552.6% | -33.9% | 
 | State Holder: Notify | 295.1% | 901.7% | 1467.0% | 174.1% | 5455.2% | -21.2% | 
 | State Holder: Notify - Many Dependents (1000) | 39.7% | 361.6% | 873.8% | 590.7% | 15116.2% | -19.8% | 
-| State Holder: Subscribe | — | — | — | — | — | — | 
-| State Holder: Unsubscribe | — | — | — | — | — | — | 
 | Recomputable View: Create | — | 459.1% | 292.4% | -58.7% | 91.8% | 14.8% | 
 | Recomputable View: Read | — | 474.3% | 133.9% | 59.0% | 1026.7% | -6.3% | 
 | Recomputable View: Recompute | — | 985.0% | 1203.9% | 46.4% | 919.3% | -45.9% | 
@@ -128,8 +124,6 @@ This table shows the percentage difference from Pureflow for each metric.
 | Cubit.notify | 0.65 |
 | Cubit.notify.many_dependents | 55.27 |
 | Cubit.read | 0.04 |
-| Cubit.subscribe | 1.27 |
-| Cubit.unsubscribe | 0.05 |
 | Cubit.write | 0.16 |
 | Sequential | 5.04 |
 

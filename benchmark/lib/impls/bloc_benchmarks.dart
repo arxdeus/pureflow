@@ -168,63 +168,6 @@ class BlocCubitNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
   }
 }
 
-class BlocCubitSubscribeBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
-  final List<StreamSubscription<int>> _subscriptions = [];
-
-  BlocCubitSubscribeBenchmark({ScoreEmitter? emitter})
-      : super('Bloc: Cubit.subscribe',
-            emitter: emitter ?? const PrintEmitter());
-
-  @override
-  void setup() {
-    cubit = CounterCubit();
-  }
-
-  @override
-  void run() {
-    _subscriptions.add(cubit.stream.listen((state) {
-      // Empty listener
-    }));
-  }
-
-  @override
-  void teardown() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
-    }
-    _subscriptions.clear();
-    cubit.close();
-  }
-}
-
-class BlocCubitUnsubscribeBenchmark extends BenchmarkBase {
-  late CounterCubit cubit;
-  late StreamSubscription<int> subscription;
-
-  BlocCubitUnsubscribeBenchmark({ScoreEmitter? emitter})
-      : super('Bloc: Cubit.unsubscribe',
-            emitter: emitter ?? const PrintEmitter());
-
-  @override
-  void setup() {
-    cubit = CounterCubit();
-    subscription = cubit.stream.listen((state) {
-      // Empty listener
-    });
-  }
-
-  @override
-  void run() {
-    subscription.cancel();
-  }
-
-  @override
-  void teardown() {
-    cubit.close();
-  }
-}
-
 // ============================================================================
 // Async Configurable Concurrency Flow Benchmarks
 // ============================================================================
@@ -294,8 +237,6 @@ Future<List<BenchmarkResult>> runBenchmark() async {
   BlocCubitWriteBenchmark(emitter: emitter).report();
   await BlocCubitNotifyBenchmark(emitter: emitter).report();
   await BlocCubitNotifyManyDependentsBenchmark(emitter: emitter).report();
-  BlocCubitSubscribeBenchmark(emitter: emitter).report();
-  BlocCubitUnsubscribeBenchmark(emitter: emitter).report();
 
   // Async Configurable Concurrency Flow Benchmarks
   await BlocSequentialBenchmark(emitter: emitter).report();
@@ -318,12 +259,6 @@ String _extractFeature(String benchmarkName) {
   }
   if (benchmarkName.contains('Cubit.notify')) {
     return 'State Holder: Notify';
-  }
-  if (benchmarkName.contains('Cubit.subscribe')) {
-    return 'State Holder: Subscribe';
-  }
-  if (benchmarkName.contains('Cubit.unsubscribe')) {
-    return 'State Holder: Unsubscribe';
   }
   if (benchmarkName.contains('Sequential')) {
     return 'Async Concurrency: Sequential';
