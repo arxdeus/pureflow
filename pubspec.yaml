@@ -15,4 +15,3 @@ dev_dependencies:
 workspace:
 - packages/pureflow
 - packages/pureflow_flutter
-- benchmark

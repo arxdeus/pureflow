@@ -2,7 +2,6 @@ name: benchmark
 description: Benchmark for Pureflow and other state management libraries.
 version: 1.0.0
 publish_to: none
-resolution: workspace
 
 environment:
   sdk: ^3.5.0
@@ -12,11 +11,11 @@ dependencies:
   pureflow: any
   caffeine: ^3.0.0
   alien_signals: ^2.3.1
-  signals_core: ^6.2.0
-  bloc: ^8.1.3
-  bloc_concurrency: ^0.2.3
-  riverpod: ^2.4.9
-  mobx: ^2.1.1+4
+  signals_core: ^7.0.0
+  bloc: ^9.2.1
+  bloc_concurrency: ^0.3.0
+  riverpod: ^3.3.2
+  mobx: ^2.6.0
   meta: ^1.14.0
   path: ^1.9.0
 
