@@ -74,6 +74,7 @@ analyzer:
     [
       tools/**,
       build/**,
+      benchmark/**,
       "**/*.freezed.dart",
       "**/*.g.dart",
       "**/*.gr.dart",
