@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:benchmark/common/benchmark_result.dart';
 import 'package:benchmark/impls/alien_signals_benchmarks.dart' as alien_signals;
 import 'package:benchmark/impls/bloc_benchmarks.dart' as bloc;
+import 'package:benchmark/impls/caffeine_benchmarks.dart' as caffeine;
 import 'package:benchmark/impls/listenable_benchmarks.dart' as listenable;
 import 'package:benchmark/impls/mobx_benchmarks.dart' as mobx;
 import 'package:benchmark/impls/pureflow_benchmarks.dart' as pureflow;
@@ -42,6 +43,10 @@ void main(List<String> args) async {
   final blocResults = await bloc.runBenchmark();
   print('  ✓ Completed (${blocResults.length} benchmarks)\n');
 
+  print('Running caffeine_benchmarks.dart...');
+  final caffeineResults = await caffeine.runBenchmark();
+  print('  ✓ Completed (${caffeineResults.length} benchmarks)\n');
+
   // Combine all results
   final allResults = <BenchmarkResult>[];
   allResults.addAll(pureflowResults);
@@ -49,6 +54,7 @@ void main(List<String> args) async {
   allResults.addAll(alienSignalsResults);
   allResults.addAll(riverpodResults);
   allResults.addAll(blocResults);
+  allResults.addAll(caffeineResults);
   allResults.addAll(listenableResults);
   allResults.addAll(mobxResults);
 
@@ -80,6 +86,7 @@ Future<void> generateReport(List<BenchmarkResult> results,
     'Riverpod',
     'Signals',
     'AlienSignals',
+    'Caffeine',
     'MobX',
     'ValueNotifier'
   ];
@@ -91,6 +98,7 @@ Future<void> generateReport(List<BenchmarkResult> results,
     'Riverpod': 'https://pub.dev/packages/riverpod',
     'Signals': 'https://pub.dev/packages/signals_core',
     'AlienSignals': 'https://pub.dev/packages/alien_signals',
+    'Caffeine': 'https://pub.dev/packages/caffeine',
     'MobX': 'https://pub.dev/packages/mobx',
     'ValueNotifier':
         'https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html',
