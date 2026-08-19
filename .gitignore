@@ -249,3 +249,6 @@ pubspec.lock
 !benchmark/bin/
 .hive
 .opencode/
+
+# Coverage raw artifacts
+coverage/test/

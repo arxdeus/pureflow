@@ -48,6 +48,9 @@ jobs:
       with:
         flutter-version: ${{ matrix.flutter-version }}
 
+    - name: Setup OIDC token
+      uses: dart-lang/setup-dart@v1
+
     - name: "Run Dry Publish"
       shell: bash
       if: ${{ github.event_name == 'pull_request' ||  github.event_name == 'push' }}
