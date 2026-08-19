@@ -1,1 +1,1 @@
-./example/main.dart
+../../../example/main.dart

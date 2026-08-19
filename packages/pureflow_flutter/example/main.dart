@@ -1,1 +1,1 @@
-./example/flutter_example.dart
+../../../example/flutter_example.dart
