@@ -32,10 +32,6 @@ abstract class ReactiveSource<T> extends Stream<T>
   /// Current node during dependency tracking.
   DependencyNode? trackingNode;
 
-  /// Tail of linked list of dependencies (sources this reactive depends on).
-  /// Used by Computed, null for Store.
-  DependencyNode? sourceDeps;
-
   /// Status flags (bit 0 = disposed).
   @override
   int status = 0;
@@ -130,32 +126,21 @@ abstract class ReactiveSource<T> extends Stream<T>
   // Reactive Dependency Tracking
   // --------------------------------------------------------------------------
 
-  /// Marks this reactive source as needing recomputation.
-  /// Override in Computed to actually mark dirty.
-  @pragma('vm:prefer-inline')
-  void markDirty() {}
-
   /// Registers this source as a dependency of the given target.
+  ///
+  /// Only reached while a Computed is recomputing (`currentView != null`),
+  /// so this sits on the recompute critical path: prefer-inline lets the
+  /// caller keep `targetView` in a register and collapse the fast path to
+  /// two loads, a compare, and a store.
   @pragma('vm:prefer-inline')
-  void trackDependency(ReactiveSource<Object?> targetView) {
+  void trackDependency(DependentSource<Object?> targetView) {
     final node = trackingNode;
 
-    // Fast path: existing active node for this target
+    // Fast path: existing node for this target — just (re)activate it.
+    // The node keeps its position in the target's source list; cleanup
+    // visits every node regardless of order, so no relinking is needed.
     if (node != null && identical(node.target, targetView)) {
-      if (node.isActive) return;
-      // Reuse existing node
       node.isActive = true;
-      // Move to end of source list if not already there
-      if (node.nextSource != null) {
-        node.nextSource!.prevSource = node.prevSource;
-        if (node.prevSource != null) {
-          node.prevSource!.nextSource = node.nextSource;
-        }
-        node.prevSource = targetView.sourceDeps;
-        node.nextSource = null;
-        targetView.sourceDeps!.nextSource = node;
-        targetView.sourceDeps = node;
-      }
       return;
     }
 
@@ -166,7 +151,7 @@ abstract class ReactiveSource<T> extends Stream<T>
   /// Slow path for creating new dependencies.
   @pragma('vm:never-inline')
   void trackDependencySlow(
-    ReactiveSource<Object?> targetView,
+    DependentSource<Object?> targetView,
     DependencyNode? oldNode,
   ) {
     // New dependency - acquire node from pool and link to target's source list
@@ -191,8 +176,9 @@ abstract class ReactiveSource<T> extends Stream<T>
   /// Notifies all subscribers (both listeners and dependencies).
   void notifySubscribers() {
     // Guard against recursive notification (inline bit check)
-    if (status.hasFlag(notifyingBit)) return;
-    status = status.setFlag(notifyingBit);
+    final s = status;
+    if (s.hasFlag(notifyingBit)) return;
+    status = s.setFlag(notifyingBit);
 
     // try/finally is required: without it a throwing listener leaves
     // notifyingBit set forever and every future notification is silently
@@ -207,6 +193,8 @@ abstract class ReactiveSource<T> extends Stream<T>
         node.target.markDirty();
       }
     } finally {
+      // Reload status: listeners may have flipped other bits (e.g. a
+      // dependent write marking this Computed dirty again).
       status = status.clearFlag(notifyingBit);
     }
   }
@@ -253,4 +241,26 @@ abstract class ReactiveSource<T> extends Stream<T>
     dependencies = null;
     trackingNode = null;
   }
+}
+
+// ============================================================================
+// Dependent Source (base for Computed)
+// ============================================================================
+
+/// A [ReactiveSource] that itself depends on other sources (i.e. Computed).
+///
+/// Keeping [sourceDeps] and [markDirty] off the plain [ReactiveSource] makes
+/// Store objects one field smaller and lets the dirty-propagation loop in
+/// [ReactiveSource.notifySubscribers] dispatch [markDirty] against a class
+/// with a single concrete implementation.
+@internal
+abstract class DependentSource<T> extends ReactiveSource<T> {
+  /// List of dependencies (sources this reactive depends on).
+  ///
+  /// Between recomputes this points at the HEAD (oldest node); during a
+  /// recompute it is advanced to the TAIL so new nodes append at the end.
+  DependencyNode? sourceDeps;
+
+  /// Marks this source as needing recomputation.
+  void markDirty();
 }

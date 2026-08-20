@@ -12,7 +12,7 @@ class DependencyNode {
   ReactiveSource<Object?> source;
 
   /// Target Computed that depends on the source.
-  ReactiveSource<Object?> target;
+  DependentSource<Object?> target;
 
   /// Whether this dependency is still active (false = recyclable).
   bool isActive = true;

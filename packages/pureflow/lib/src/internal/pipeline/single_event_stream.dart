@@ -65,11 +65,40 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
   Future<void> _run() async {
     final evt = event; // Cache for hot path
     try {
-      // Future.sync wraps synchronous exceptions into Future errors
-      final result = await Future.sync(() => evt.task(evt));
+      // A synchronously throwing task must not reach the catch block
+      // synchronously (the completer would completeError before
+      // Pipeline.run returned its future, making the error unhandled).
+      // Route sync throws through Future.error, which delivers the error
+      // in a later microtask. The common case — task returns a future —
+      // awaits that future directly with no extra wrapper or closure.
+      Future<dynamic> taskFuture;
+      try {
+        taskFuture = evt.task(evt);
+      } catch (error, stackTrace) {
+        taskFuture = Future<dynamic>.error(error, stackTrace);
+      }
+      final result = await taskFuture;
       final statusFlag = _statusFlag;
       if (!statusFlag.hasFlag(canceledBit) && evt.isActive) {
-        await _completeWithResult(result);
+        // Complete the caller's future first.
+        final completer = evt.completer;
+        if (!completer.isCompleted) {
+          completer.complete(result);
+        }
+        _lastData = result;
+
+        // Wait for resume only when actually paused; the common (unpaused)
+        // path stays fully synchronous — no extra microtask per event.
+        if (_statusFlag.hasFlag(pausedBit)) {
+          final resumeCompleter = _resumeCompleter ??= Completer<void>();
+          await resumeCompleter.future;
+          _resumeCompleter = null;
+        }
+        if (!_statusFlag.hasFlag(canceledBit)) {
+          _invokeDataHandler(result);
+          _invokeDoneHandlerIfNeeded();
+          _completeAsFutureWithSuccess();
+        }
       } else {
         // Task was cancelled, but still complete the completer to avoid hanging
         final completer = evt.completer;
@@ -109,28 +138,6 @@ class SinglePipelineEventSubscription implements StreamSubscription<dynamic> {
     if (statusFlag.hasFlag(canceledBit)) return;
     _statusFlag = statusFlag.setFlag(didCallDoneBit);
     _onDone?.call();
-  }
-
-  Future<void> _completeWithResult(dynamic result) async {
-    final completer = event.completer;
-    if (!completer.isCompleted) {
-      completer.complete(result);
-    }
-    _lastData = result;
-
-    // Wait for resume if paused
-    var statusFlag = _statusFlag;
-    if (statusFlag.hasFlag(pausedBit) && !statusFlag.hasFlag(canceledBit)) {
-      final resumeCompleter = _resumeCompleter ??= Completer<void>();
-      await resumeCompleter.future;
-      _resumeCompleter = null;
-      statusFlag = _statusFlag;
-    }
-    if (statusFlag.hasFlag(canceledBit)) return;
-
-    _invokeDataHandler(result);
-    _invokeDoneHandlerIfNeeded();
-    _completeAsFutureWithSuccess();
   }
 
   Future<void> _completeWithError(Object error, StackTrace stackTrace) async {

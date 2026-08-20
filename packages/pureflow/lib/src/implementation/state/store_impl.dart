@@ -54,11 +54,13 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
       return;
     }
 
-    final oldValue = _value;
-    _value = newValue;
-
     // Observer plumbing kept out-of-line to keep the common path lean.
-    if (Pureflow.observer != null) {
+    // The old value only needs to stay live on the observer branch.
+    if (Pureflow.observer == null) {
+      _value = newValue;
+    } else {
+      final oldValue = _value;
+      _value = newValue;
       _notifyObserverChanged(oldValue, newValue);
     }
 
@@ -76,7 +78,7 @@ class StoreImpl<T> extends ReactiveSource<T> implements Store<T> {
     }
 
     // Fast path: skip notification if no listeners or dependencies
-    if (!hasListeners) {
+    if (listeners == null && dependencies == null) {
       return;
     }
     // Notify all subscribers (listeners + dependencies)

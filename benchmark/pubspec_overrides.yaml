@@ -1,0 +1,5 @@
+# Route the benchmark at the local workspace package so `make benchmark`
+# measures the code in this repo, not the last published pub.dev release.
+dependency_overrides:
+  pureflow:
+    path: ../packages/pureflow

@@ -8,18 +8,21 @@ import 'package:pureflow/src/internal/state/reactive_source.dart';
 import 'package:pureflow/src/observer.dart';
 
 // ============================================================================
-// Equality Check Helpers (Inline for Performance)
-// ============================================================================
-
-// ============================================================================
 // ComputedImpl - Optimized Implementation with bit flags
 // ============================================================================
 
 /// Implementation of [Computed].
+///
+/// All state bits (base `ReactiveSource` flags and the view flags
+/// dirty/running/disposed/hasValue) share the single inherited [status]
+/// field. The bit positions are disjoint (see `globals.dart`), which lets
+/// the hot paths test several conditions with one field load and one mask.
 @internal
-class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
+class ComputedImpl<T> extends DependentSource<T> implements Computed<T> {
   ComputedImpl(this._compute, {bool Function(T, T)? equality, this.debugLabel})
       : _equals = equality {
+    // Start dirty so the first read computes.
+    status = dirtyBit;
     final observer = Pureflow.observer;
     observer?.onCreated?.call(debugLabel, FlowKind.computed);
   }
@@ -36,26 +39,40 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   final bool Function(T, T)? _equals;
   late T _value;
 
-  /// Status flags: bit 0 = dirty, bit 1 = running, bit 2 = disposed, bit 3 = hasValue
-  int _viewStatus = dirtyBit; // Start dirty
-
   @override
   @pragma('vm:prefer-inline')
   T get value {
-    final viewStatus = _viewStatus;
+    final s = status;
 
-    // Check for cycle (running bit set) - inline
-    if (viewStatus.hasFlag(runningBit)) {
+    // Fast path: clean, not running, not disposed — one load, one mask.
+    if ((s & (dirtyBit | runningBit | viewDisposedBit)) == 0) {
+      final targetView = currentView;
+      if (targetView != null) {
+        // targetView can never be `this` here: while this Computed is
+        // being computed its runningBit is set, which routes to the slow
+        // path (and throws on the cycle).
+        trackDependency(targetView);
+      }
+      return _value;
+    }
+
+    return _valueSlow(s);
+  }
+
+  @pragma('vm:never-inline')
+  T _valueSlow(int s) {
+    // Check for cycle (running bit set)
+    if (s.hasFlag(runningBit)) {
       throw StateError('Cycle detected in Computed computation');
     }
 
-    // Recompute if dirty - inline
-    if (viewStatus.hasFlag(dirtyBit)) {
+    // Recompute if dirty
+    if (s.hasFlag(dirtyBit)) {
       _recompute();
     }
 
     // Track self as dependency if inside another Computed and not disposed
-    if (!viewStatus.hasFlag(viewDisposedBit)) {
+    if (!s.hasFlag(viewDisposedBit)) {
       final targetView = currentView;
       if (targetView != null && !identical(targetView, this)) {
         trackDependency(targetView);
@@ -69,10 +86,10 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   @override
   @pragma('vm:prefer-inline')
   void markDirty() {
-    final viewStatus = _viewStatus;
+    final s = status;
     // Already dirty or disposed - skip (inline combined check)
-    if (viewStatus.hasFlag(dirtyBit | viewDisposedBit)) return;
-    _viewStatus = viewStatus.setFlag(dirtyBit);
+    if (s.hasFlag(dirtyBit | viewDisposedBit)) return;
+    status = s.setFlag(dirtyBit);
 
     // During a batch (including the flush phase), defer notification so
     // listeners fire once per batch instead of once per flushed dependency.
@@ -85,7 +102,7 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     // means notifySubscribers would only toggle status bits and walk two
     // empty lists. Skipping it matters in wide fanouts (1000 leaf
     // computeds per source write in benchmarks).
-    if (!hasListeners) return;
+    if (listeners == null && dependencies == null) return;
 
     // Notify all subscribers (listeners + dependent Computed values)
     notifySubscribers();
@@ -100,8 +117,9 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   void _deferToBatch() {
     // Already enqueued, or currently delivering notifications (the in-flight
     // notifySubscribers covers this change — mirrors its re-entrancy guard).
-    if (status.hasFlag(inBatchBit | notifyingBit)) return;
-    status = status.setFlag(inBatchBit);
+    final s = status;
+    if (s.hasFlag(inBatchBit | notifyingBit)) return;
+    status = s.setFlag(inBatchBit);
     if (batchCount >= batchBuffer.length) {
       batchBuffer.length *= 2;
     }
@@ -109,17 +127,17 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   }
 
   void _recompute() {
-    final viewStatus = _viewStatus;
+    final s = status;
 
     // If disposed, just compute without tracking - inline
-    if (viewStatus.hasFlag(viewDisposedBit)) {
+    if (s.hasFlag(viewDisposedBit)) {
       _value = _compute();
-      _viewStatus = viewStatus.clearFlag(dirtyBit);
+      status = s.clearFlag(dirtyBit);
       return;
     }
 
     // Mark as running - inline
-    _viewStatus = viewStatus.setFlag(runningBit);
+    status = s.setFlag(runningBit);
 
     // Prepare existing dependencies for reuse
     _prepareDependencies();
@@ -127,78 +145,98 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     final previousView = currentView;
     currentView = this;
 
-    var succeeded = false;
-    late final T newValue;
+    T newValue;
     try {
       newValue = _compute();
-      succeeded = true;
-    } finally {
+    } catch (_) {
       currentView = previousView;
-      // Always cleanup dependencies and clear runningBit, even on error.
       _cleanupDependencies();
       // Keep dirtyBit set when _compute throws so the next access re-runs
       // the computation (documented behavior). Clearing it on error would
       // make the next read skip recompute and hit the uninitialized
       // `late _value` (LateInitializationError) on first evaluation.
-      _viewStatus = succeeded
-          ? _viewStatus.clearFlag(dirtyBit | runningBit)
-          : _viewStatus.clearFlag(runningBit);
+      status = status.clearFlag(runningBit);
+      rethrow;
     }
 
-    final isFirstValue = !_viewStatus.hasFlag(hasValueBit);
+    currentView = previousView;
+    _cleanupDependencies();
+
+    // Fresh status load: compute may have flipped bits (e.g. a side-effect
+    // write re-dirtying this computed); only dirty/running are cleared here.
+    final s2 = status.clearFlag(dirtyBit | runningBit);
+    status = s2;
+
+    final isFirstValue = !s2.hasFlag(hasValueBit);
     final eq = _equals;
-    final shouldNotify = isFirstValue ||
-        !(eq == null
-            ? identical(_value, newValue) || _value == newValue
-            : eq(_value, newValue));
 
     // Only notify if value actually changed
-    if (shouldNotify) {
-      final observer = Pureflow.observer;
-      final oldValue = isFirstValue ? null : _value as Object?;
-
-      _viewStatus = _viewStatus.setFlag(hasValueBit);
-      _value = newValue;
-
-      observer?.onObservableChanged?.call(
-        debugLabel,
-        FlowKind.computed,
-        oldValue,
-        newValue,
-      );
-
-      // A recompute can happen mid-batch (e.g. the batch action reads this
-      // value, or a listener of an earlier flushed source does). Defer the
-      // notification instead of firing it mid-batch.
-      //
-      // During the flush phase itself the dirty cycle has already enqueued
-      // (or delivered) this Computed's notification, so scheduling another
-      // one would double-fire listeners. The only exception is the very
-      // first materialization of a value: initial dirtyBit is set by the
-      // constructor, not by markDirty, so no announcement exists yet.
-      if (batchDepth > 0) {
-        if (!batchFlushing || isFirstValue) {
-          _deferToBatch();
-        }
-      } else {
-        notifySubscribers();
-      }
+    if (!isFirstValue &&
+        (eq == null
+            ? identical(_value, newValue) || _value == newValue
+            : eq(_value, newValue))) {
+      return;
     }
+
+    // Fresh load again: a side-effecting custom equality may have set
+    // dirtyBit; setFlag on the current value preserves it.
+    status = status.setFlag(hasValueBit);
+
+    // Observer plumbing kept out-of-line to keep the common path lean.
+    // `oldValue` must be captured before `_value` is overwritten.
+    if (Pureflow.observer == null) {
+      _value = newValue;
+    } else {
+      final oldValue = isFirstValue ? null : _value as Object?;
+      _value = newValue;
+      _notifyObserverChanged(oldValue, newValue);
+    }
+
+    // A recompute can happen mid-batch (e.g. the batch action reads this
+    // value, or a listener of an earlier flushed source does). Defer the
+    // notification instead of firing it mid-batch.
+    //
+    // During the flush phase itself the dirty cycle has already enqueued
+    // (or delivered) this Computed's notification, so scheduling another
+    // one would double-fire listeners. The only exception is the very
+    // first materialization of a value: initial dirtyBit is set by the
+    // constructor, not by markDirty, so no announcement exists yet.
+    if (batchDepth > 0) {
+      if (!batchFlushing || isFirstValue) {
+        _deferToBatch();
+      }
+    } else if (listeners != null || dependencies != null) {
+      notifySubscribers();
+    }
+  }
+
+  @pragma('vm:never-inline')
+  void _notifyObserverChanged(Object? oldValue, T newValue) {
+    Pureflow.observer?.onObservableChanged?.call(
+      debugLabel,
+      FlowKind.computed,
+      oldValue,
+      newValue,
+    );
   }
 
   /// Mark all dependency nodes as recyclable.
   void _prepareDependencies() {
-    for (var node = sourceDeps; node != null; node = node.nextSource) {
+    final head = sourceDeps;
+    if (head == null) return;
+    var node = head;
+    while (true) {
       final source = node.source;
       node.rollback = source.trackingNode;
       source.trackingNode = node;
       node.isActive = false;
 
-      // Move tail pointer
-      if (node.nextSource == null) {
-        sourceDeps = node;
-      }
+      final next = node.nextSource;
+      if (next == null) break;
+      node = next;
     }
+    // Advance to tail so new nodes append at the end during compute.
+    sourceDeps = node;
   }
 
   /// Remove unused dependencies (those still inactive).
@@ -244,7 +282,7 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     bool? cancelOnError,
   }) {
     // Trigger initial computation to establish dependencies - inline
-    if (_viewStatus.hasFlag(dirtyBit)) {
+    if (status.hasFlag(dirtyBit)) {
       _recompute();
     }
     return ReactiveSubscription<T>(this, onData, onDone);
@@ -253,8 +291,8 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
   @override
   void dispose() {
     // Inline bit check
-    if (_viewStatus.hasFlag(viewDisposedBit)) return;
-    _viewStatus = _viewStatus.setFlag(viewDisposedBit);
+    if (status.hasFlag(viewDisposedBit)) return;
+    status = status.setFlag(viewDisposedBit);
     _cleanupDependencies(disposeAll: true);
     sourceDeps = null;
     super.dispose();
@@ -266,9 +304,10 @@ class ComputedImpl<T> extends ReactiveSource<T> implements Computed<T> {
     if (debugLabel != null) {
       sb.write('[$debugLabel]');
     }
-    final state = switch (_viewStatus) {
-      _ when _viewStatus.hasFlag(viewDisposedBit) => 'disposed',
-      _ when _viewStatus.hasFlag(dirtyBit) => 'dirty',
+    final s = status;
+    final state = switch (s) {
+      _ when s.hasFlag(viewDisposedBit) => 'disposed',
+      _ when s.hasFlag(dirtyBit) => 'dirty',
       _ => '$_value',
     };
     sb.write('($state)');
