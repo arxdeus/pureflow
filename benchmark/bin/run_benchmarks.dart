@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:benchmark/common/benchmark_result.dart';
 import 'package:benchmark/impls/alien_signals_benchmarks.dart' as alien_signals;
 import 'package:benchmark/impls/bloc_benchmarks.dart' as bloc;
+import 'package:benchmark/impls/bloc_signals_benchmarks.dart' as bloc_signals;
 import 'package:benchmark/impls/caffeine_benchmarks.dart' as caffeine;
 import 'package:benchmark/impls/listenable_benchmarks.dart' as listenable;
 import 'package:benchmark/impls/mobx_benchmarks.dart' as mobx;
@@ -43,6 +44,10 @@ void main(List<String> args) async {
   final blocResults = await bloc.runBenchmark();
   print('  ✓ Completed (${blocResults.length} benchmarks)\n');
 
+  print('Running bloc_signals_benchmarks.dart...');
+  final blocSignalsResults = await bloc_signals.runBenchmark();
+  print('  ✓ Completed (${blocSignalsResults.length} benchmarks)\n');
+
   print('Running caffeine_benchmarks.dart...');
   final caffeineResults = await caffeine.runBenchmark();
   print('  ✓ Completed (${caffeineResults.length} benchmarks)\n');
@@ -54,6 +59,7 @@ void main(List<String> args) async {
   allResults.addAll(alienSignalsResults);
   allResults.addAll(riverpodResults);
   allResults.addAll(blocResults);
+  allResults.addAll(blocSignalsResults);
   allResults.addAll(caffeineResults);
   allResults.addAll(listenableResults);
   allResults.addAll(mobxResults);
@@ -83,6 +89,7 @@ Future<void> generateReport(List<BenchmarkResult> results,
   final libraries = [
     'Pureflow',
     'Bloc',
+    'BlocSignals',
     'Riverpod',
     'Signals',
     'AlienSignals',
@@ -95,6 +102,7 @@ Future<void> generateReport(List<BenchmarkResult> results,
   final libraryUrls = {
     'Pureflow': 'https://pub.dev/packages/pureflow',
     'Bloc': 'https://pub.dev/packages/bloc',
+    'BlocSignals': 'https://pub.dev/packages/bloc_signals',
     'Riverpod': 'https://pub.dev/packages/riverpod',
     'Signals': 'https://pub.dev/packages/signals_core',
     'AlienSignals': 'https://pub.dev/packages/alien_signals',
