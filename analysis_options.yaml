@@ -69,17 +69,20 @@ analyzer:
     use_function_type_syntax_for_parameters: warning
     use_string_buffers: warning
     use_enums: warning
-
   exclude:
-    [
-      tools/**,
-      build/**,
-      benchmark/**,
-      "**/*.freezed.dart",
-      "**/*.g.dart",
-      "**/*.gr.dart",
-      "**/*.gen.dart",
-    ]
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+    - tools/**
+    - benchmark/**
+    - "**/*.freezed.dart"
+    - "**/*.g.dart"
+    - "**/*.gr.dart"
+    - "**/*.gen.dart"
 
 formatter:
   page_width: 80
