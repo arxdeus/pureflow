@@ -1,241 +1,393 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:benchmark/common/benchmark_report.dart';
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark/impls/alien_signals_benchmarks.dart' as alien_signals;
-import 'package:benchmark/impls/bloc_benchmarks.dart' as bloc;
-import 'package:benchmark/impls/bloc_signals_benchmarks.dart' as bloc_signals;
-import 'package:benchmark/impls/caffeine_benchmarks.dart' as caffeine;
-import 'package:benchmark/impls/listenable_benchmarks.dart' as listenable;
-import 'package:benchmark/impls/mobx_benchmarks.dart' as mobx;
-import 'package:benchmark/impls/pureflow_benchmarks.dart' as pureflow;
-import 'package:benchmark/impls/riverpod_benchmarks.dart' as riverpod;
-import 'package:benchmark/impls/signals_core_benchmarks.dart' as signals;
+import 'package:benchmark/common/benchmark_trial_aggregation.dart';
 
-void main(List<String> args) async {
-  print('Running all benchmarks...\n');
+const _defaultTrials = 3;
+const _defaultSeed = 1337;
+const _snapshotPaths = <String>[
+  'benchmark/bin',
+  'benchmark/lib',
+  'benchmark/pubspec.yaml',
+  'benchmark/pubspec.lock',
+  'packages/pureflow',
+];
+const _resolvedInputPaths = <String>[
+  'benchmark/.dart_tool/package_config.json',
+];
 
-  // Run Pureflow benchmarks first (baseline)
-  print('Running pureflow_benchmarks.dart...');
-  final pureflowResults = await pureflow.runBenchmark();
-  print('  ✓ Completed (${pureflowResults.length} benchmarks)\n');
+const _libraries = <_LibrarySpec>[
+  _LibrarySpec('pureflow', 'Pureflow', 'https://pub.dev/packages/pureflow'),
+  _LibrarySpec('bloc', 'Bloc', 'https://pub.dev/packages/bloc'),
+  _LibrarySpec(
+    'bloc_signals',
+    'BlocSignals',
+    'https://pub.dev/packages/bloc_signals',
+  ),
+  _LibrarySpec('riverpod', 'Riverpod', 'https://pub.dev/packages/riverpod'),
+  _LibrarySpec('signals', 'Signals', 'https://pub.dev/packages/signals_core'),
+  _LibrarySpec(
+    'alien_signals',
+    'AlienSignals',
+    'https://pub.dev/packages/alien_signals',
+  ),
+  _LibrarySpec('caffeine', 'Caffeine', 'https://pub.dev/packages/caffeine'),
+  _LibrarySpec('mobx', 'MobX', 'https://pub.dev/packages/mobx'),
+];
 
-  // Run other benchmarks
-  print('Running signals_core_benchmarks.dart...');
-  final signalsResults = await signals.runBenchmark();
-  print('  ✓ Completed (${signalsResults.length} benchmarks)\n');
+const _featureOrder = <String>[
+  'State Holder: Lifecycle (Create + Use + Release)',
+  'State Holder: Read',
+  'State Holder: Write',
+  'State Holder: Notify',
+  'State Holder: Notify - Many Dependents (1000)',
+  'Recomputable View: Lifecycle (Create + Evaluate + Release)',
+  'Recomputable View: Read',
+  'Recomputable View: Recompute',
+  'Recomputable View: Chain',
+  'Recomputable View: Many Dependents (1000)',
+  'Async Concurrency: Sequential',
+];
 
-  print('Running alien_signals_benchmarks.dart...');
-  final alienSignalsResults = await alien_signals.runBenchmark();
-  print('  ✓ Completed (${alienSignalsResults.length} benchmarks)\n');
+Future<void> main(List<String> arguments) async {
+  final root = _findRepositoryRoot();
+  final trials = _readOption(arguments, '--trials', _defaultTrials);
+  final seed = _readOption(arguments, '--seed', _defaultSeed);
 
-  print('Running riverpod_benchmarks.dart...');
-  final riverpodResults = await riverpod.runBenchmark();
-  print('  ✓ Completed (${riverpodResults.length} benchmarks)\n');
+  if (trials < 3 || trials.isEven) {
+    throw ArgumentError.value(
+      trials,
+      'trials',
+      'must be an odd number greater than or equal to 3',
+    );
+  }
 
-  print('Running listenable_benchmarks.dart...');
-  final listenableResults = await listenable.runBenchmark();
-  print('  ✓ Completed (${listenableResults.length} benchmarks)\n');
+  final initialSnapshot = await _captureSourceSnapshot(root);
+  stdout.writeln('Compiling isolated AOT benchmark worker...');
+  final worker = await _compileWorker(root);
+  stdout.writeln('  ✓ ${worker.path}\n');
 
-  print('Running mobx_benchmarks.dart...');
-  final mobxResults = await mobx.runBenchmark();
-  print('  ✓ Completed (${mobxResults.length} benchmarks)\n');
+  final trialResults = <List<BenchmarkResult>>[];
+  for (var trialIndex = 0; trialIndex < trials; trialIndex++) {
+    final order = _libraries.toList()..shuffle(Random(seed + trialIndex));
+    stdout.writeln(
+      'Trial ${trialIndex + 1}/$trials: '
+      '${order.map((library) => library.displayName).join(', ')}',
+    );
 
-  print('Running bloc_benchmarks.dart...');
-  final blocResults = await bloc.runBenchmark();
-  print('  ✓ Completed (${blocResults.length} benchmarks)\n');
+    final results = <BenchmarkResult>[];
+    for (final library in order) {
+      stdout.write('  ${library.displayName}...');
+      final libraryResults = await _runWorker(root, worker, library.id);
+      results.addAll(libraryResults);
+      stdout.writeln(' ${libraryResults.length} benchmarks');
+    }
+    trialResults.add(results);
+    stdout.writeln();
+  }
 
-  print('Running bloc_signals_benchmarks.dart...');
-  final blocSignalsResults = await bloc_signals.runBenchmark();
-  print('  ✓ Completed (${blocSignalsResults.length} benchmarks)\n');
+  final finalSnapshot = await _captureSourceSnapshot(root);
+  if (finalSnapshot.fingerprint != initialSnapshot.fingerprint) {
+    throw StateError(
+      'Benchmark source files changed while benchmarks were running. '
+      'Discard these results and rerun from a stable snapshot.\n'
+      'Before: ${initialSnapshot.fingerprint}\n'
+      'After:  ${finalSnapshot.fingerprint}',
+    );
+  }
 
-  print('Running caffeine_benchmarks.dart...');
-  final caffeineResults = await caffeine.runBenchmark();
-  print('  ✓ Completed (${caffeineResults.length} benchmarks)\n');
-
-  // Combine all results
-  final allResults = <BenchmarkResult>[];
-  allResults.addAll(pureflowResults);
-  allResults.addAll(signalsResults);
-  allResults.addAll(alienSignalsResults);
-  allResults.addAll(riverpodResults);
-  allResults.addAll(blocResults);
-  allResults.addAll(blocSignalsResults);
-  allResults.addAll(caffeineResults);
-  allResults.addAll(listenableResults);
-  allResults.addAll(mobxResults);
-
-  print('Generating BENCHMARK_README.md...');
-  await generateReport(allResults, pureflowResults);
-  print('  ✓ Done!\n');
+  final statistics = aggregateBenchmarkTrials(trialResults);
+  final provenance = await _collectProvenance(
+    root,
+    trials,
+    seed,
+    initialSnapshot,
+  );
+  final report = renderBenchmarkReport(
+    statistics: statistics,
+    provenance: provenance,
+    libraries: _libraries.map((library) => library.reportSpec).toList(),
+    featureOrder: _featureOrder,
+  );
+  final reportFile = File('${root.path}/benchmark/BENCHMARK_README.md');
+  await reportFile.writeAsString(report);
+  stdout.writeln('Generated ${reportFile.path}');
 }
 
-Future<void> generateReport(List<BenchmarkResult> results,
-    List<BenchmarkResult> pureflowResults) async {
-  // Group results by feature
-  final featureGroups = <String, Map<String, double>>{};
+int _readOption(List<String> arguments, String name, int fallback) {
+  final prefix = '$name=';
+  final matches = arguments.where((argument) => argument.startsWith(prefix));
+  if (matches.isEmpty) {
+    return fallback;
+  }
+  if (matches.length > 1) {
+    throw ArgumentError('Option $name may only be specified once.');
+  }
+  return int.parse(matches.single.substring(prefix.length));
+}
 
-  for (final result in results) {
-    featureGroups.putIfAbsent(result.feature, () => {});
-    featureGroups[result.feature]![result.library] = result.value;
+Directory _findRepositoryRoot() {
+  var current = Directory.current.absolute;
+  while (true) {
+    if (File('${current.path}/benchmark/pubspec.yaml').existsSync()) {
+      return current;
+    }
+    final parent = current.parent;
+    if (parent.path == current.path) {
+      throw StateError('Could not locate benchmark/pubspec.yaml.');
+    }
+    current = parent;
+  }
+}
+
+Future<File> _compileWorker(Directory root) async {
+  final extension = Platform.isWindows ? '.exe' : '';
+  final output = File(
+    '${root.path}/benchmark/.dart_tool/benchmark_worker$extension',
+  );
+  await output.parent.create(recursive: true);
+  if (output.existsSync()) {
+    await output.delete();
   }
 
-  // Create Pureflow baseline map by feature
-  final pureflowBaseline = <String, double>{};
-  for (final result in pureflowResults) {
-    pureflowBaseline[result.feature] = result.value;
+  final result = await Process.run(
+    Platform.resolvedExecutable,
+    [
+      'compile',
+      'exe',
+      '--enable-asserts',
+      'benchmark/bin/benchmark_worker.dart',
+      '-o',
+      output.path,
+    ],
+    workingDirectory: root.path,
+  );
+  if (result.exitCode != 0) {
+    throw ProcessException(
+      Platform.resolvedExecutable,
+      const ['compile', 'exe', 'benchmark/bin/benchmark_worker.dart'],
+      '${result.stdout}\n${result.stderr}',
+      result.exitCode,
+    );
+  }
+  return output;
+}
+
+Future<List<BenchmarkResult>> _runWorker(
+  Directory root,
+  File worker,
+  String library,
+) async {
+  final result = await Process.run(
+    worker.path,
+    [library],
+    workingDirectory: root.path,
+  );
+  if (result.exitCode != 0) {
+    throw ProcessException(
+      worker.path,
+      [library],
+      '${result.stdout}\n${result.stderr}',
+      result.exitCode,
+    );
   }
 
-  // Define library order
-  final libraries = [
-    'Pureflow',
-    'Bloc',
-    'BlocSignals',
-    'Riverpod',
-    'Signals',
-    'AlienSignals',
-    'Caffeine',
-    'MobX',
-    'ValueNotifier'
+  final outputLines = (result.stdout as String)
+      .split('\n')
+      .where((line) => line.trim().isNotEmpty)
+      .toList();
+  if (outputLines.isEmpty) {
+    throw StateError('Benchmark worker $library produced no results.');
+  }
+  final decoded = jsonDecode(outputLines.last) as List<Object?>;
+  return decoded
+      .map(
+        (entry) => BenchmarkResult.fromJson(
+          (entry! as Map<Object?, Object?>).cast<String, Object?>(),
+        ),
+      )
+      .toList();
+}
+
+Future<BenchmarkReportProvenance> _collectProvenance(
+  Directory root,
+  int trials,
+  int seed,
+  _SourceSnapshot snapshot,
+) async {
+  var cpu = Platform.environment['PROCESSOR_IDENTIFIER'] ?? 'unknown';
+  if (Platform.isMacOS) {
+    final result = await Process.run(
+      'sysctl',
+      const ['-n', 'machdep.cpu.brand_string'],
+    );
+    if (result.exitCode == 0) {
+      cpu = (result.stdout as String).trim();
+    }
+  }
+
+  return BenchmarkReportProvenance(
+    generatedAt: DateTime.now().toUtc().toIso8601String(),
+    sourceFingerprint: snapshot.fingerprint,
+    dartVersion: Platform.version.split('\n').first,
+    operatingSystem:
+        '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+    cpu: cpu,
+    logicalProcessors: Platform.numberOfProcessors,
+    trials: trials,
+    seed: seed,
+    packageVersions: _readPackageVersions(root),
+  );
+}
+
+Future<_SourceSnapshot> _captureSourceSnapshot(Directory root) async {
+  final sourceArguments = [
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '-z',
+    '--',
+    ..._snapshotPaths,
   ];
+  final sourceResult = await Process.run(
+    'git',
+    sourceArguments,
+    workingDirectory: root.path,
+    stdoutEncoding: null,
+    stderrEncoding: null,
+  );
+  if (sourceResult.exitCode != 0) {
+    throw ProcessException(
+      'git',
+      sourceArguments,
+      utf8.decode(sourceResult.stderr as List<int>, allowMalformed: true),
+      sourceResult.exitCode,
+    );
+  }
 
-  // Library URLs for hyperlinks
-  final libraryUrls = {
-    'Pureflow': 'https://pub.dev/packages/pureflow',
-    'Bloc': 'https://pub.dev/packages/bloc',
-    'BlocSignals': 'https://pub.dev/packages/bloc_signals',
-    'Riverpod': 'https://pub.dev/packages/riverpod',
-    'Signals': 'https://pub.dev/packages/signals_core',
-    'AlienSignals': 'https://pub.dev/packages/alien_signals',
-    'Caffeine': 'https://pub.dev/packages/caffeine',
-    'MobX': 'https://pub.dev/packages/mobx',
-    'ValueNotifier':
-        'https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html',
+  final snapshot = BytesBuilder(copy: false);
+  final sourcePaths = utf8
+      .decode(sourceResult.stdout as List<int>)
+      .split('\u0000')
+      .where((path) => path.isNotEmpty)
+      .toList()
+    ..sort();
+  for (final path in sourcePaths) {
+    snapshot
+      ..add(utf8.encode('\nSOURCE $path\n'))
+      ..add(await File('${root.path}/$path').readAsBytes());
+  }
+  for (final path in _resolvedInputPaths) {
+    final file = File('${root.path}/$path');
+    if (!file.existsSync()) {
+      throw StateError('Missing resolved benchmark input: $path');
+    }
+    snapshot
+      ..add(utf8.encode('\nRESOLVED $path\n'))
+      ..add(
+        _normalizePackageConfiguration(
+          jsonDecode(await file.readAsString()),
+        ),
+      );
+  }
+
+  final hashProcess = await Process.start(
+    'git',
+    const ['hash-object', '--stdin'],
+    workingDirectory: root.path,
+  );
+  hashProcess.stdin.add(snapshot.takeBytes());
+  await hashProcess.stdin.close();
+  final hashOutput = await utf8.decoder.bind(hashProcess.stdout).join();
+  final hashError = await utf8.decoder.bind(hashProcess.stderr).join();
+  final hashExitCode = await hashProcess.exitCode;
+  if (hashExitCode != 0) {
+    throw ProcessException(
+      'git',
+      const ['hash-object', '--stdin'],
+      hashError,
+      hashExitCode,
+    );
+  }
+
+  return _SourceSnapshot(hashOutput.trim());
+}
+
+List<int> _normalizePackageConfiguration(Object? decoded) {
+  final configuration =
+      (decoded! as Map<Object?, Object?>).cast<String, Object?>();
+  final packages = (configuration['packages']! as List<Object?>).map((entry) {
+    final package = (entry! as Map<Object?, Object?>).cast<String, Object?>();
+    return <String, Object?>{
+      'name': package['name'],
+      'rootUri': package['rootUri'],
+      'packageUri': package['packageUri'],
+      'languageVersion': package['languageVersion'],
+    };
+  }).toList()
+    ..sort(
+      (a, b) => (a['name']! as String).compareTo(b['name']! as String),
+    );
+  return utf8.encode(
+    jsonEncode({
+      'configVersion': configuration['configVersion'],
+      'packages': packages,
+    }),
+  );
+}
+
+Map<String, String> _readPackageVersions(Directory root) {
+  const wanted = {
+    'benchmark_harness',
+    'pureflow',
+    'bloc_signals',
+    'caffeine',
+    'alien_signals',
+    'signals_core',
+    'bloc',
+    'bloc_concurrency',
+    'riverpod',
+    'mobx',
   };
-
-  // Helper function to create library header with hyperlink
-  String libraryHeader(String library) {
-    final url = libraryUrls[library];
-    if (url != null) {
-      return '[$library]($url)';
+  final versions = <String, String>{};
+  final lines = File('${root.path}/benchmark/pubspec.lock').readAsLinesSync();
+  String? package;
+  for (final line in lines) {
+    final packageMatch = RegExp(r'^  ([a-zA-Z0-9_]+):$').firstMatch(line);
+    if (packageMatch != null) {
+      package = packageMatch.group(1);
+      continue;
     }
-    return library;
-  }
-
-  // Build markdown table
-  final buffer = StringBuffer();
-  buffer.writeln('# Benchmark Results\n');
-  buffer.writeln(
-      'This document contains performance comparison results between Pureflow and other state management libraries.\n');
-  buffer.writeln('## Results Summary\n');
-
-  // Create table header with hyperlinks
-  final headerRow = StringBuffer('| Feature | ');
-  final separatorRow = StringBuffer('|---------|');
-  for (final library in libraries) {
-    headerRow.write('${libraryHeader(library)} | ');
-    separatorRow.write('---|');
-  }
-  buffer.writeln(headerRow.toString());
-  buffer.writeln(separatorRow.toString());
-
-  // Sort features by category
-  final sortedFeatures = featureGroups.keys.toList()
-    ..sort((a, b) {
-      final categoryOrder = {
-        'State Holder': 1,
-        'Recomputable View': 2,
-        'Async Concurrency': 3,
-      };
-      final aCategory = a.split(':')[0];
-      final bCategory = b.split(':')[0];
-      return (categoryOrder[aCategory] ?? 999)
-          .compareTo(categoryOrder[bCategory] ?? 999);
-    });
-
-  for (final feature in sortedFeatures) {
-    final featureResults = featureGroups[feature]!;
-    final row = StringBuffer('| $feature | ');
-
-    // Add results for each library
-    for (final libraryName in libraries) {
-      final value = featureResults[libraryName];
-      if (value != null) {
-        // Format value with 2 decimal places
-        row.write('${value.toStringAsFixed(2)} us | ');
-      } else {
-        row.write('— | ');
+    if (package != null && wanted.contains(package)) {
+      final versionMatch =
+          RegExp(r'^    version: "?([^" ]+)"?$').firstMatch(line);
+      if (versionMatch != null) {
+        versions[package] = versionMatch.group(1)!;
+        package = null;
       }
     }
-
-    buffer.writeln(row.toString());
   }
+  return Map.fromEntries(
+      versions.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+}
 
-  buffer.writeln('\n## Performance Comparison (vs Pureflow)\n');
-  buffer.writeln(
-      'This table shows the percentage difference from Pureflow for each metric.\n');
-  // Create comparison table header with hyperlinks (skip Pureflow)
-  final comparisonHeaderRow = StringBuffer('| Feature | ');
-  final comparisonSeparatorRow = StringBuffer('|---------|');
-  for (final library in libraries.skip(1)) {
-    comparisonHeaderRow.write('${libraryHeader(library)} | ');
-    comparisonSeparatorRow.write('---|');
-  }
-  buffer.writeln(comparisonHeaderRow.toString());
-  buffer.writeln(comparisonSeparatorRow.toString());
+class _LibrarySpec {
+  const _LibrarySpec(this.id, this.displayName, this.url);
 
-  for (final feature in sortedFeatures) {
-    final featureResults = featureGroups[feature]!;
-    final pureflowValue = pureflowBaseline[feature];
-    final row = StringBuffer('| $feature | ');
+  final String id;
+  final String displayName;
+  final String url;
 
-    // Skip Pureflow in comparison table
-    for (final libraryName in libraries.skip(1)) {
-      final value = featureResults[libraryName];
-      if (value != null && pureflowValue != null) {
-        // Calculate percentage difference: ((value - pureflowValue) / pureflowValue) * 100
-        final percentDiff = ((value - pureflowValue) / pureflowValue) * 100;
-        row.write('${percentDiff.toStringAsFixed(1)}% | ');
-      } else {
-        row.write('— | ');
-      }
-    }
+  BenchmarkLibrarySpec get reportSpec => BenchmarkLibrarySpec(displayName, url);
+}
 
-    buffer.writeln(row.toString());
-  }
+class _SourceSnapshot {
+  const _SourceSnapshot(this.fingerprint);
 
-  buffer.writeln('\n## Detailed Results\n');
-
-  // Group by library for detailed view
-  final libraryGroups = <String, List<BenchmarkResult>>{};
-  for (final result in results) {
-    libraryGroups.putIfAbsent(result.library, () => []);
-    libraryGroups[result.library]!.add(result);
-  }
-
-  for (final libraryName in libraries) {
-    final libraryResults = libraryGroups[libraryName] ?? [];
-    if (libraryResults.isEmpty) continue;
-
-    buffer.writeln('### $libraryName\n');
-    buffer.writeln('| Benchmark | Time (μs) |');
-    buffer.writeln('|-----------|-----------|');
-
-    libraryResults.sort((a, b) => a.name.compareTo(b.name));
-    for (final result in libraryResults) {
-      buffer.writeln('| ${result.name} | ${result.value.toStringAsFixed(2)} |');
-    }
-    buffer.writeln();
-  }
-
-  buffer.writeln('---\n');
-  buffer.writeln(
-      '*Generated automatically by `benchmark/bin/run_benchmarks.dart`*');
-
-  // Write to file
-  final file = File('benchmark/BENCHMARK_README.md');
-  if (file.existsSync()) {
-    await file.delete(recursive: true);
-  }
-  await file.create(recursive: true);
-  await file.writeAsString(buffer.toString());
+  final String fingerprint;
 }

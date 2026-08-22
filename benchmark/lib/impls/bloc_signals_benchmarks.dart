@@ -3,7 +3,7 @@
 import 'dart:async';
 
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:benchmark/common/fair_benchmark_base.dart';
 import 'package:bloc_signals/bloc_signals.dart';
 
 // ============================================================================
@@ -14,29 +14,25 @@ class CounterCubit extends CubitSignal<int> {
   CounterCubit() : super(initialState: 42);
 }
 
-class BlocSignalsCubitCreateBenchmark extends BenchmarkBase {
-  final List<CounterCubit> _cubits = [];
+class BlocSignalsCubitCreateBenchmark extends AsyncBenchmarkBase {
+  int _result = 0;
 
   BlocSignalsCubitCreateBenchmark({ScoreEmitter? emitter})
       : super(
-          'BlocSignals: CubitSignal.create',
+          'BlocSignals: CubitSignal.lifecycle',
           emitter: emitter ?? const PrintEmitter(),
         );
 
   @override
-  void run() {
+  Future<void> run() async {
     final cubit = CounterCubit();
-    _cubits.add(cubit);
-  }
-
-  @override
-  void teardown() {
-    _cubits.clear();
+    _result = cubit.stateValue;
+    await cubit.close();
   }
 }
 
-class BlocSignalsCubitReadBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
+class BlocSignalsCubitReadBenchmark extends SyncRunAsyncLifecycleBenchmarkBase {
+  late CounterCubit cubit;
   int _result = 0;
 
   BlocSignalsCubitReadBenchmark({ScoreEmitter? emitter})
@@ -46,7 +42,7 @@ class BlocSignalsCubitReadBenchmark extends BenchmarkBase {
         );
 
   @override
-  void setup() {
+  Future<void> setup() async {
     cubit = CounterCubit();
   }
 
@@ -56,13 +52,14 @@ class BlocSignalsCubitReadBenchmark extends BenchmarkBase {
   }
 
   @override
-  void teardown() {
-    unawaited(cubit.close());
+  Future<void> teardown() async {
+    await cubit.close();
   }
 }
 
-class BlocSignalsCubitWriteBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
+class BlocSignalsCubitWriteBenchmark
+    extends SyncRunAsyncLifecycleBenchmarkBase {
+  late CounterCubit cubit;
   int _counter = 0;
 
   BlocSignalsCubitWriteBenchmark({ScoreEmitter? emitter})
@@ -72,7 +69,7 @@ class BlocSignalsCubitWriteBenchmark extends BenchmarkBase {
         );
 
   @override
-  void setup() {
+  Future<void> setup() async {
     cubit = CounterCubit();
   }
 
@@ -82,15 +79,17 @@ class BlocSignalsCubitWriteBenchmark extends BenchmarkBase {
   }
 
   @override
-  void teardown() {
-    unawaited(cubit.close());
+  Future<void> teardown() async {
+    await cubit.close();
   }
 }
 
-class BlocSignalsCubitNotifyBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
+class BlocSignalsCubitNotifyBenchmark
+    extends SyncRunAsyncLifecycleBenchmarkBase {
+  late CounterCubit cubit;
   int _counter = 0;
   int _notifications = 0;
+  int _checksum = 0;
 
   BlocSignalsCubitNotifyBenchmark({ScoreEmitter? emitter})
       : super(
@@ -99,10 +98,11 @@ class BlocSignalsCubitNotifyBenchmark extends BenchmarkBase {
         );
 
   @override
-  void setup() {
+  Future<void> setup() async {
     cubit = CounterCubit();
     cubit.createEffect(() {
-      final _ = cubit.state.value;
+      final value = cubit.state.value;
+      _checksum += value;
       _notifications++;
     });
   }
@@ -113,14 +113,16 @@ class BlocSignalsCubitNotifyBenchmark extends BenchmarkBase {
   }
 
   @override
-  void teardown() {
-    unawaited(cubit.close());
+  Future<void> teardown() async {
+    await cubit.close();
   }
 }
 
-class BlocSignalsCubitNotifyManyDependentsBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
+class BlocSignalsCubitNotifyManyDependentsBenchmark
+    extends SyncRunAsyncLifecycleBenchmarkBase {
+  late CounterCubit cubit;
   int _counter = 0;
+  int _checksum = 0;
 
   BlocSignalsCubitNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super(
@@ -129,11 +131,11 @@ class BlocSignalsCubitNotifyManyDependentsBenchmark extends BenchmarkBase {
         );
 
   @override
-  void setup() {
+  Future<void> setup() async {
     cubit = CounterCubit();
     for (var i = 0; i < 1000; i++) {
       cubit.createEffect(() {
-        final _ = cubit.state.value;
+        _checksum += cubit.state.value;
       });
     }
   }
@@ -144,8 +146,8 @@ class BlocSignalsCubitNotifyManyDependentsBenchmark extends BenchmarkBase {
   }
 
   @override
-  void teardown() {
-    unawaited(cubit.close());
+  Future<void> teardown() async {
+    await cubit.close();
   }
 }
 
@@ -166,37 +168,49 @@ class SequentialBloc extends BlocSignal<int, int> {
 }
 
 class BlocSignalsSequentialBenchmark extends AsyncBenchmarkBase {
-  late final SequentialBloc bloc;
+  late SequentialBloc bloc;
   int _counter = 0;
-  int _expected = -1;
-  late Completer<int> _completer;
+  late Completer<void> _completer;
+  final List<int> _received = [];
+  int _checksum = 0;
 
   BlocSignalsSequentialBenchmark({ScoreEmitter? emitter})
       : super(
           'BlocSignals: Sequential',
           emitter: emitter ?? const PrintEmitter(),
+          operationsPerRun: 2,
         );
 
   @override
   Future<void> setup() async {
     bloc = SequentialBloc();
-    _completer = Completer<int>();
+    _completer = Completer<void>();
     bloc.createEffect(() {
       final state = bloc.state.value;
-      if (state == _expected && !_completer.isCompleted) {
-        _completer.complete(state);
+      if (state == 0) return;
+      _received.add(state);
+      _checksum += state;
+      if (_received.length == 2 && !_completer.isCompleted) {
+        _completer.complete();
       }
     });
   }
 
   @override
   Future<void> run() async {
-    final value = ++_counter;
-    _expected = value;
-    _completer = Completer<int>();
-    bloc.add(value);
-    final newValue = await _completer.future;
-    assert(value == newValue, 'Wrong bloc signal value: $value != $newValue');
+    final first = ++_counter;
+    final second = ++_counter;
+    _received.clear();
+    _completer = Completer<void>();
+    bloc
+      ..add(first)
+      ..add(second);
+    await _completer.future;
+    if (_received[0] != first || _received[1] != second) {
+      throw StateError(
+        'Wrong bloc signal order: $_received != [$first, $second]',
+      );
+    }
   }
 
   @override
@@ -210,13 +224,14 @@ class BlocSignalsSequentialBenchmark extends AsyncBenchmarkBase {
 // ============================================================================
 
 Future<List<BenchmarkResult>> runBenchmark() async {
-  final emitter = CollectingScoreEmitter(_extractFeature);
+  final emitter = CollectingScoreEmitter(_extractFeature, _extractTiming);
 
-  BlocSignalsCubitCreateBenchmark(emitter: emitter).report();
-  BlocSignalsCubitReadBenchmark(emitter: emitter).report();
-  BlocSignalsCubitWriteBenchmark(emitter: emitter).report();
-  BlocSignalsCubitNotifyBenchmark(emitter: emitter).report();
-  BlocSignalsCubitNotifyManyDependentsBenchmark(emitter: emitter).report();
+  await BlocSignalsCubitCreateBenchmark(emitter: emitter).report();
+  await BlocSignalsCubitReadBenchmark(emitter: emitter).report();
+  await BlocSignalsCubitWriteBenchmark(emitter: emitter).report();
+  await BlocSignalsCubitNotifyBenchmark(emitter: emitter).report();
+  await BlocSignalsCubitNotifyManyDependentsBenchmark(emitter: emitter)
+      .report();
 
   await BlocSignalsSequentialBenchmark(emitter: emitter).report();
 
@@ -224,8 +239,8 @@ Future<List<BenchmarkResult>> runBenchmark() async {
 }
 
 String _extractFeature(String benchmarkName) {
-  if (benchmarkName.contains('CubitSignal.create')) {
-    return 'State Holder: Create';
+  if (benchmarkName.contains('CubitSignal.lifecycle')) {
+    return 'State Holder: Lifecycle (Create + Use + Release)';
   }
   if (benchmarkName.contains('CubitSignal.read')) {
     return 'State Holder: Read';
@@ -243,6 +258,14 @@ String _extractFeature(String benchmarkName) {
     return 'Async Concurrency: Sequential';
   }
   return benchmarkName;
+}
+
+BenchmarkTiming _extractTiming(String benchmarkName) {
+  if (benchmarkName.contains('CubitSignal.lifecycle') ||
+      benchmarkName.contains('Sequential')) {
+    return BenchmarkTiming.asyncSettled;
+  }
+  return BenchmarkTiming.synchronous;
 }
 
 Future<void> main() async {

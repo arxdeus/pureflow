@@ -4,33 +4,28 @@ import 'dart:async';
 
 import 'package:alien_signals/alien_signals.dart' as alien;
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:benchmark/common/fair_benchmark_base.dart';
 
 // ============================================================================
 // State Holder Benchmarks
 // ============================================================================
 
-class AlienSignalsStoreCreateBenchmark extends BenchmarkBase {
-  final List<alien.WritableSignal<int>> _signals = [];
+class AlienSignalsStoreLifecycleBenchmark extends BenchmarkBase {
+  int _result = 0;
 
-  AlienSignalsStoreCreateBenchmark({ScoreEmitter? emitter})
-      : super('AlienSignals: Signal.create',
+  AlienSignalsStoreLifecycleBenchmark({ScoreEmitter? emitter})
+      : super('AlienSignals: Signal.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    _signals.add(alien.signal(42));
-  }
-
-  @override
-  void teardown() {
-    // No explicit dispose in alien_signals; signals are GC'd.
-    _signals.clear();
+    final signal = alien.signal(42);
+    _result = signal();
   }
 }
 
 class AlienSignalsStoreReadBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
+  late alien.WritableSignal<int> s;
   int _result = 0;
 
   AlienSignalsStoreReadBenchmark({ScoreEmitter? emitter})
@@ -49,7 +44,7 @@ class AlienSignalsStoreReadBenchmark extends BenchmarkBase {
 }
 
 class AlienSignalsStoreWriteBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
+  late alien.WritableSignal<int> s;
   int _counter = 0;
 
   AlienSignalsStoreWriteBenchmark({ScoreEmitter? emitter})
@@ -71,13 +66,12 @@ class AlienSignalsStoreWriteBenchmark extends BenchmarkBase {
 /// subscription primitive. Each notification re-runs the effect closure with
 /// full dependency re-tracking (unlink + relink), and writes go through the
 /// propagate → queue → flush machinery. This overhead is inherent to
-/// alien_signals' design, unlike plain `addListener` callbacks
-/// (Pureflow, ValueNotifier).
+/// alien_signals' design, unlike Pureflow's plain `addListener` callbacks.
 class AlienSignalsStoreNotifyBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
+  late alien.WritableSignal<int> s;
   int _counter = 0;
   int _notifications = 0;
-  late final alien.Effect _stop;
+  late alien.Effect _stop;
 
   AlienSignalsStoreNotifyBenchmark({ScoreEmitter? emitter})
       : super('AlienSignals: Signal.notify',
@@ -87,8 +81,7 @@ class AlienSignalsStoreNotifyBenchmark extends BenchmarkBase {
   void setup() {
     s = alien.signal(0);
     _stop = alien.effect(() {
-      final _ = s();
-      _notifications++;
+      _notifications += s();
     });
   }
 
@@ -106,9 +99,10 @@ class AlienSignalsStoreNotifyBenchmark extends BenchmarkBase {
 /// Note: Same `effect()` re-tracking overhead as Notify, multiplied by
 /// 1000 dependents.
 class AlienSignalsStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
+  late alien.WritableSignal<int> s;
   final List<alien.Effect> _stops = [];
   int _counter = 0;
+  int _checksum = 0;
 
   AlienSignalsStoreNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super('AlienSignals: Signal.notify.many_dependents',
@@ -119,7 +113,7 @@ class AlienSignalsStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
     s = alien.signal(0);
     for (var i = 0; i < 1000; i++) {
       final stop = alien.effect(() {
-        final _ = s();
+        _checksum += s();
       });
       _stops.add(stop);
     }
@@ -143,33 +137,24 @@ class AlienSignalsStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
 // Recomputable View Benchmarks
 // ============================================================================
 
-class AlienSignalsComputedCreateBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
-  final List<alien.Computed<int>> _computeds = [];
+class AlienSignalsComputedLifecycleBenchmark extends BenchmarkBase {
+  int _result = 0;
 
-  AlienSignalsComputedCreateBenchmark({ScoreEmitter? emitter})
-      : super('AlienSignals: Computed.create',
+  AlienSignalsComputedLifecycleBenchmark({ScoreEmitter? emitter})
+      : super('AlienSignals: Computed.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
-    s = alien.signal(42);
-  }
-
-  @override
   void run() {
-    _computeds.add(alien.computed((_) => s() * 2));
-  }
-
-  @override
-  void teardown() {
-    _computeds.clear();
+    final signal = alien.signal(42);
+    final computed = alien.computed((_) => signal() * 2);
+    _result = computed();
   }
 }
 
 class AlienSignalsComputedReadBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
-  late final alien.Computed<int> c;
+  late alien.WritableSignal<int> s;
+  late alien.Computed<int> c;
   int _result = 0;
 
   AlienSignalsComputedReadBenchmark({ScoreEmitter? emitter})
@@ -180,6 +165,7 @@ class AlienSignalsComputedReadBenchmark extends BenchmarkBase {
   void setup() {
     s = alien.signal(42);
     c = alien.computed((_) => s() * 2);
+    _result = c();
   }
 
   @override
@@ -189,8 +175,8 @@ class AlienSignalsComputedReadBenchmark extends BenchmarkBase {
 }
 
 class AlienSignalsComputedRecomputeBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
-  late final alien.Computed<int> c;
+  late alien.WritableSignal<int> s;
+  late alien.Computed<int> c;
   int _counter = 0;
   int _result = 0;
 
@@ -202,6 +188,7 @@ class AlienSignalsComputedRecomputeBenchmark extends BenchmarkBase {
   void setup() {
     s = alien.signal(0);
     c = alien.computed((_) => s() * 2);
+    _result = c();
   }
 
   @override
@@ -212,9 +199,9 @@ class AlienSignalsComputedRecomputeBenchmark extends BenchmarkBase {
 }
 
 class AlienSignalsComputedChainBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
-  late final alien.Computed<int> doubled;
-  late final alien.Computed<int> sum;
+  late alien.WritableSignal<int> s;
+  late alien.Computed<int> doubled;
+  late alien.Computed<int> sum;
   int _counter = 0;
   int _result = 0;
 
@@ -227,6 +214,7 @@ class AlienSignalsComputedChainBenchmark extends BenchmarkBase {
     s = alien.signal(0);
     doubled = alien.computed((_) => s() * 2);
     sum = alien.computed((_) => doubled() + 10);
+    _result = sum();
   }
 
   @override
@@ -236,13 +224,14 @@ class AlienSignalsComputedChainBenchmark extends BenchmarkBase {
   }
 }
 
-class AlienSignalsComputedChainManyDependentsBenchmark extends BenchmarkBase {
-  late final alien.WritableSignal<int> s;
+class AlienSignalsComputedManyDependentsBenchmark extends BenchmarkBase {
+  late alien.WritableSignal<int> s;
   final List<alien.Computed<int>> _computeds = [];
   int _counter = 0;
+  int _checksum = 0;
 
-  AlienSignalsComputedChainManyDependentsBenchmark({ScoreEmitter? emitter})
-      : super('AlienSignals: Computed.chain.many_dependents',
+  AlienSignalsComputedManyDependentsBenchmark({ScoreEmitter? emitter})
+      : super('AlienSignals: Computed.many_dependents',
             emitter: emitter ?? const PrintEmitter());
 
   @override
@@ -251,15 +240,15 @@ class AlienSignalsComputedChainManyDependentsBenchmark extends BenchmarkBase {
     for (var i = 0; i < 1000; i++) {
       final computed = alien.computed((_) => s() * 2);
       _computeds.add(computed);
+      _checksum += computed();
     }
   }
 
   @override
   void run() {
     s.set(++_counter);
-    // Access all computeds to trigger recomputation
     for (final computed in _computeds) {
-      final _ = computed();
+      _checksum += computed();
     }
   }
 
@@ -275,28 +264,28 @@ class AlienSignalsComputedChainManyDependentsBenchmark extends BenchmarkBase {
 
 Future<List<BenchmarkResult>> runBenchmark() async {
   // Create custom emitter to collect results
-  final emitter = CollectingScoreEmitter(_extractFeature);
+  final emitter = CollectingScoreEmitter(_extractFeature, _extractTiming);
 
   // State Holder Benchmarks
-  AlienSignalsStoreCreateBenchmark(emitter: emitter).report();
+  AlienSignalsStoreLifecycleBenchmark(emitter: emitter).report();
   AlienSignalsStoreReadBenchmark(emitter: emitter).report();
   AlienSignalsStoreWriteBenchmark(emitter: emitter).report();
   AlienSignalsStoreNotifyBenchmark(emitter: emitter).report();
   AlienSignalsStoreNotifyManyDependentsBenchmark(emitter: emitter).report();
 
   // Recomputable View Benchmarks
-  AlienSignalsComputedCreateBenchmark(emitter: emitter).report();
+  AlienSignalsComputedLifecycleBenchmark(emitter: emitter).report();
   AlienSignalsComputedReadBenchmark(emitter: emitter).report();
   AlienSignalsComputedRecomputeBenchmark(emitter: emitter).report();
   AlienSignalsComputedChainBenchmark(emitter: emitter).report();
-  AlienSignalsComputedChainManyDependentsBenchmark(emitter: emitter).report();
+  AlienSignalsComputedManyDependentsBenchmark(emitter: emitter).report();
 
   return emitter.results;
 }
 
 String _extractFeature(String benchmarkName) {
-  if (benchmarkName.contains('Signal.create')) {
-    return 'State Holder: Create';
+  if (benchmarkName.contains('Signal.lifecycle')) {
+    return 'State Holder: Lifecycle (Create + Use + Release)';
   }
   if (benchmarkName.contains('Signal.read')) {
     return 'State Holder: Read';
@@ -310,8 +299,8 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Signal.notify')) {
     return 'State Holder: Notify';
   }
-  if (benchmarkName.contains('Computed.create')) {
-    return 'Recomputable View: Create';
+  if (benchmarkName.contains('Computed.lifecycle')) {
+    return 'Recomputable View: Lifecycle (Create + Evaluate + Release)';
   }
   if (benchmarkName.contains('Computed.read')) {
     return 'Recomputable View: Read';
@@ -319,13 +308,17 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Computed.recompute')) {
     return 'Recomputable View: Recompute';
   }
-  if (benchmarkName.contains('Computed.chain.many_dependents')) {
-    return 'Recomputable View: Chain - Many Dependents (1000)';
+  if (benchmarkName.contains('Computed.many_dependents')) {
+    return 'Recomputable View: Many Dependents (1000)';
   }
   if (benchmarkName.contains('Computed.chain')) {
     return 'Recomputable View: Chain';
   }
   return benchmarkName;
+}
+
+BenchmarkTiming _extractTiming(String benchmarkName) {
+  return BenchmarkTiming.synchronous;
 }
 
 Future<void> main() async {

@@ -3,9 +3,17 @@
 import 'dart:async';
 
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:benchmark/common/fair_benchmark_base.dart';
 import 'package:bloc/bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
+
+// The same batch size is used by Bloc and Caffeine. Sensitivity checks at
+// 16/32/64 operations showed per-operation scores had reached a stable range
+// by 32 while keeping each harness exercise bounded.
+const _asyncDeliveryBatchSize = 32;
+
+int _expectedBatchSum(int first) =>
+    _asyncDeliveryBatchSize * (2 * first + _asyncDeliveryBatchSize - 1) ~/ 2;
 
 // ============================================================================
 // State Holder Benchmarks
@@ -15,37 +23,30 @@ class CounterCubit extends Cubit<int> {
   CounterCubit() : super(42);
 }
 
-class BlocCubitCreateBenchmark extends BenchmarkBase {
-  final List<CounterCubit> _cubits = [];
+class BlocCubitCreateBenchmark extends AsyncBenchmarkBase {
+  int _result = 0;
 
   BlocCubitCreateBenchmark({ScoreEmitter? emitter})
-      : super('Bloc: Cubit.create', emitter: emitter ?? const PrintEmitter());
+      : super('Bloc: Cubit.lifecycle',
+            emitter: emitter ?? const PrintEmitter());
 
   @override
-  void run() {
+  Future<void> run() async {
     final cubit = CounterCubit();
-    _cubits.add(cubit);
-  }
-
-  @override
-  void teardown() {
-    // Don't call close() on each of ~2M cubits — each close() creates
-    // an unawaited Future (async StreamController.close()). Those ~2M
-    // microtasks would flood the event loop on the next await, causing
-    // massive delay. Just clear the list and let GC handle cleanup.
-    _cubits.clear();
+    _result = cubit.state;
+    await cubit.close();
   }
 }
 
-class BlocCubitReadBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
+class BlocCubitReadBenchmark extends SyncRunAsyncLifecycleBenchmarkBase {
+  late CounterCubit cubit;
   int _result = 0;
 
   BlocCubitReadBenchmark({ScoreEmitter? emitter})
       : super('Bloc: Cubit.read', emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
+  Future<void> setup() async {
     cubit = CounterCubit();
   }
 
@@ -55,20 +56,20 @@ class BlocCubitReadBenchmark extends BenchmarkBase {
   }
 
   @override
-  void teardown() {
-    cubit.close();
+  Future<void> teardown() async {
+    await cubit.close();
   }
 }
 
-class BlocCubitWriteBenchmark extends BenchmarkBase {
-  late final CounterCubit cubit;
+class BlocCubitWriteBenchmark extends SyncRunAsyncLifecycleBenchmarkBase {
+  late CounterCubit cubit;
   int _counter = 0;
 
   BlocCubitWriteBenchmark({ScoreEmitter? emitter})
       : super('Bloc: Cubit.write', emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
+  Future<void> setup() async {
     cubit = CounterCubit();
   }
 
@@ -78,41 +79,64 @@ class BlocCubitWriteBenchmark extends BenchmarkBase {
   }
 
   @override
-  void teardown() {
-    cubit.close();
+  Future<void> teardown() async {
+    await cubit.close();
   }
 }
 
 /// Measures the cost of emit + async delivery to 1 stream listener.
 /// Uses Bloc's native `stream.listen()` — events are delivered asynchronously
 /// via microtasks. This async overhead is inherent to Bloc's architecture;
-/// other libraries (Pureflow, Signals, MobX, ValueNotifier) notify
+/// other libraries (Pureflow, Signals, MobX) notify
 /// synchronously.
 class BlocCubitNotifyBenchmark extends AsyncBenchmarkBase {
-  late final CounterCubit cubit;
-  late final StreamSubscription<int> _subscription;
-  late Completer<void> _completer;
+  late CounterCubit cubit;
+  late StreamSubscription<int> _subscription;
   int _counter = 0;
+  int _remaining = 0;
+  int _lastValue = 0;
+  late Completer<void> _batchDone;
+  int _checksum = 0;
 
   BlocCubitNotifyBenchmark({ScoreEmitter? emitter})
-      : super('Bloc: Cubit.notify', emitter: emitter ?? const PrintEmitter());
+      : super(
+          'Bloc: Cubit.notify',
+          emitter: emitter ?? const PrintEmitter(),
+          operationsPerRun: _asyncDeliveryBatchSize,
+        );
 
   @override
   Future<void> setup() async {
     cubit = CounterCubit();
-    _completer = Completer<void>();
+    _batchDone = Completer<void>();
     _subscription = cubit.stream.listen((state) {
-      if (!_completer.isCompleted) {
-        _completer.complete();
+      _checksum += state;
+      _lastValue = state;
+      if (_remaining == 0) return;
+      if (--_remaining == 0) {
+        _batchDone.complete();
+      } else {
+        _emitNext();
       }
     });
   }
 
+  void _emitNext() => cubit.emit(++_counter);
+
   @override
   Future<void> run() async {
-    _completer = Completer<void>();
-    cubit.emit(++_counter);
-    await _completer.future;
+    final first = _counter + 1;
+    final checksumBefore = _checksum;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _emitNext();
+    await _batchDone.future;
+
+    final expectedLast = first + _asyncDeliveryBatchSize - 1;
+    if (_lastValue != expectedLast ||
+        _checksum - checksumBefore != _expectedBatchSum(first)) {
+      throw StateError('Wrong bloc notification batch.');
+    }
   }
 
   @override
@@ -127,35 +151,56 @@ class BlocCubitNotifyBenchmark extends AsyncBenchmarkBase {
 /// via its own microtask. This is how real Bloc apps with multiple
 /// BlocBuilders/stream.listen calls work.
 class BlocCubitNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
-  late final CounterCubit cubit;
+  late CounterCubit cubit;
   final List<StreamSubscription<int>> _subscriptions = [];
-  late Completer<void> _completer;
   int _counter = 0;
   int _notified = 0;
+  int _remaining = 0;
+  int _lastValue = 0;
+  late Completer<void> _batchDone;
+  int _checksum = 0;
 
   BlocCubitNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super('Bloc: Cubit.notify.many_dependents',
-            emitter: emitter ?? const PrintEmitter());
+            emitter: emitter ?? const PrintEmitter(),
+            operationsPerRun: _asyncDeliveryBatchSize);
 
   @override
   Future<void> setup() async {
     cubit = CounterCubit();
-    _completer = Completer<void>();
+    _batchDone = Completer<void>();
     for (var i = 0; i < 1000; i++) {
       _subscriptions.add(cubit.stream.listen((state) {
-        if (++_notified == 1000 && !_completer.isCompleted) {
-          _completer.complete();
+        _checksum += state;
+        _lastValue = state;
+        if (_remaining == 0 || ++_notified != 1000) return;
+        _notified = 0;
+        if (--_remaining == 0) {
+          _batchDone.complete();
+        } else {
+          _emitNext();
         }
       }));
     }
   }
 
+  void _emitNext() => cubit.emit(++_counter);
+
   @override
   Future<void> run() async {
+    final first = _counter + 1;
+    final checksumBefore = _checksum;
     _notified = 0;
-    _completer = Completer<void>();
-    cubit.emit(++_counter);
-    await _completer.future;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _emitNext();
+    await _batchDone.future;
+
+    final expectedLast = first + _asyncDeliveryBatchSize - 1;
+    if (_lastValue != expectedLast ||
+        _checksum - checksumBefore != _expectedBatchSum(first) * 1000) {
+      throw StateError('Wrong bloc fan-out batch.');
+    }
   }
 
   @override
@@ -185,35 +230,49 @@ class SequentialBloc extends Bloc<int, int> {
 }
 
 class BlocSequentialBenchmark extends AsyncBenchmarkBase {
-  late final SequentialBloc bloc;
+  late SequentialBloc bloc;
   int _counter = 0;
-  late final StreamSubscription<int> _subscription;
-  late Completer<int> _completer;
+  late StreamSubscription<int> _subscription;
+  late Completer<void> _completer;
+  final List<int> _received = [];
+  int _checksum = 0;
 
   BlocSequentialBenchmark({ScoreEmitter? emitter})
-      : super('Bloc: Sequential', emitter: emitter ?? const PrintEmitter());
+      : super(
+          'Bloc: Sequential',
+          emitter: emitter ?? const PrintEmitter(),
+          operationsPerRun: 2,
+        );
 
   @override
   Future<void> setup() async {
     bloc = SequentialBloc();
-    _completer = Completer<int>();
+    _completer = Completer<void>();
     // Single persistent subscription — avoids creating/cancelling a
     // broadcast subscription on every iteration (stream.first pattern),
     // which is racy with async broadcast delivery.
     _subscription = bloc.stream.listen((state) {
-      if (!_completer.isCompleted) {
-        _completer.complete(state);
+      _received.add(state);
+      _checksum += state;
+      if (_received.length == 2 && !_completer.isCompleted) {
+        _completer.complete();
       }
     });
   }
 
   @override
   Future<void> run() async {
-    final value = ++_counter;
-    _completer = Completer<int>();
-    bloc.add(value);
-    final newValue = await _completer.future;
-    assert(value == newValue, 'Wrong bloc value: $value != $newValue');
+    final first = ++_counter;
+    final second = ++_counter;
+    _received.clear();
+    _completer = Completer<void>();
+    bloc
+      ..add(first)
+      ..add(second);
+    await _completer.future;
+    if (_received[0] != first || _received[1] != second) {
+      throw StateError('Wrong bloc order: $_received != [$first, $second]');
+    }
   }
 
   @override
@@ -229,12 +288,12 @@ class BlocSequentialBenchmark extends AsyncBenchmarkBase {
 
 Future<List<BenchmarkResult>> runBenchmark() async {
   // Create custom emitter to collect results
-  final emitter = CollectingScoreEmitter(_extractFeature);
+  final emitter = CollectingScoreEmitter(_extractFeature, _extractTiming);
 
   // State Holder Benchmarks
-  BlocCubitCreateBenchmark(emitter: emitter).report();
-  BlocCubitReadBenchmark(emitter: emitter).report();
-  BlocCubitWriteBenchmark(emitter: emitter).report();
+  await BlocCubitCreateBenchmark(emitter: emitter).report();
+  await BlocCubitReadBenchmark(emitter: emitter).report();
+  await BlocCubitWriteBenchmark(emitter: emitter).report();
   await BlocCubitNotifyBenchmark(emitter: emitter).report();
   await BlocCubitNotifyManyDependentsBenchmark(emitter: emitter).report();
 
@@ -245,8 +304,8 @@ Future<List<BenchmarkResult>> runBenchmark() async {
 }
 
 String _extractFeature(String benchmarkName) {
-  if (benchmarkName.contains('Cubit.create')) {
-    return 'State Holder: Create';
+  if (benchmarkName.contains('Cubit.lifecycle')) {
+    return 'State Holder: Lifecycle (Create + Use + Release)';
   }
   if (benchmarkName.contains('Cubit.read')) {
     return 'State Holder: Read';
@@ -265,6 +324,15 @@ String _extractFeature(String benchmarkName) {
   }
 
   return benchmarkName;
+}
+
+BenchmarkTiming _extractTiming(String benchmarkName) {
+  if (benchmarkName.contains('Cubit.lifecycle') ||
+      benchmarkName.contains('Cubit.notify') ||
+      benchmarkName.contains('Sequential')) {
+    return BenchmarkTiming.asyncSettled;
+  }
+  return BenchmarkTiming.synchronous;
 }
 
 Future<void> main() async {

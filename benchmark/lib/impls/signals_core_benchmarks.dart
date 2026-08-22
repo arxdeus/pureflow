@@ -3,7 +3,7 @@
 import 'dart:async';
 
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:benchmark/common/fair_benchmark_base.dart';
 import 'package:signals_core/signals_core.dart' as sig;
 
 // ============================================================================
@@ -11,28 +11,22 @@ import 'package:signals_core/signals_core.dart' as sig;
 // ============================================================================
 
 class SignalsCoreStoreCreateBenchmark extends BenchmarkBase {
-  final List<sig.Signal<int>> _signals = [];
+  int _result = 0;
 
   SignalsCoreStoreCreateBenchmark({ScoreEmitter? emitter})
-      : super('Signals: Signal.create',
+      : super('Signals: Signal.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    _signals.add(sig.signal(42));
-  }
-
-  @override
-  void teardown() {
-    for (final s in _signals) {
-      s.dispose();
-    }
-    _signals.clear();
+    final s = sig.signal(42);
+    _result = s.value;
+    s.dispose();
   }
 }
 
 class SignalsCoreStoreReadBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
+  late sig.Signal<int> s;
   int _result = 0;
 
   SignalsCoreStoreReadBenchmark({ScoreEmitter? emitter})
@@ -55,7 +49,7 @@ class SignalsCoreStoreReadBenchmark extends BenchmarkBase {
 }
 
 class SignalsCoreStoreWriteBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
+  late sig.Signal<int> s;
   int _counter = 0;
 
   SignalsCoreStoreWriteBenchmark({ScoreEmitter? emitter})
@@ -79,10 +73,10 @@ class SignalsCoreStoreWriteBenchmark extends BenchmarkBase {
 }
 
 class SignalsCoreStoreNotifyBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
+  late sig.Signal<int> s;
   int _counter = 0;
   int _notifications = 0;
-  late final sig.EffectCleanup cleanup;
+  late sig.EffectCleanup cleanup;
 
   SignalsCoreStoreNotifyBenchmark({ScoreEmitter? emitter})
       : super('Signals: Signal.notify',
@@ -92,8 +86,7 @@ class SignalsCoreStoreNotifyBenchmark extends BenchmarkBase {
   void setup() {
     s = sig.signal(0);
     cleanup = sig.effect(() {
-      final _ = s.value;
-      _notifications++;
+      _notifications += s.value;
     });
   }
 
@@ -110,9 +103,10 @@ class SignalsCoreStoreNotifyBenchmark extends BenchmarkBase {
 }
 
 class SignalsCoreStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
+  late sig.Signal<int> s;
   final List<sig.EffectCleanup> _cleanups = [];
   int _counter = 0;
+  int _checksum = 0;
 
   SignalsCoreStoreNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super('Signals: Signal.notify.many_dependents',
@@ -123,7 +117,7 @@ class SignalsCoreStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
     s = sig.signal(0);
     for (var i = 0; i < 1000; i++) {
       final cleanup = sig.effect(() {
-        final _ = s.value;
+        _checksum += s.value;
       });
       _cleanups.add(cleanup);
     }
@@ -139,6 +133,7 @@ class SignalsCoreStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
     for (final cleanup in _cleanups) {
       cleanup();
     }
+    _cleanups.clear();
     s.dispose();
   }
 }
@@ -148,35 +143,25 @@ class SignalsCoreStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
 // ============================================================================
 
 class SignalsCoreComputedCreateBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
-  final List<sig.Computed<int>> _computeds = [];
+  int _result = 0;
 
   SignalsCoreComputedCreateBenchmark({ScoreEmitter? emitter})
-      : super('Signals: Computed.create',
+      : super('Signals: Computed.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
-    s = sig.signal(42);
-  }
-
-  @override
   void run() {
-    _computeds.add(sig.computed(() => s.value * 2));
-  }
-
-  @override
-  void teardown() {
-    // Dispose signal first to release dependency graph, then clear computeds.
-    // Avoids potentially O(n²) teardown if signal's subscriber removal is O(n).
+    final s = sig.signal(42);
+    final c = sig.computed(() => s.value * 2);
+    _result = c.value;
+    c.dispose();
     s.dispose();
-    _computeds.clear();
   }
 }
 
 class SignalsCoreComputedReadBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
-  late final sig.Computed<int> c;
+  late sig.Signal<int> s;
+  late sig.Computed<int> c;
   int _result = 0;
 
   SignalsCoreComputedReadBenchmark({ScoreEmitter? emitter})
@@ -187,6 +172,7 @@ class SignalsCoreComputedReadBenchmark extends BenchmarkBase {
   void setup() {
     s = sig.signal(42);
     c = sig.computed(() => s.value * 2);
+    _result = c.value;
   }
 
   @override
@@ -202,8 +188,8 @@ class SignalsCoreComputedReadBenchmark extends BenchmarkBase {
 }
 
 class SignalsCoreComputedRecomputeBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
-  late final sig.Computed<int> c;
+  late sig.Signal<int> s;
+  late sig.Computed<int> c;
   int _counter = 0;
   int _result = 0;
 
@@ -215,6 +201,7 @@ class SignalsCoreComputedRecomputeBenchmark extends BenchmarkBase {
   void setup() {
     s = sig.signal(0);
     c = sig.computed(() => s.value * 2);
+    _result = c.value;
   }
 
   @override
@@ -231,9 +218,9 @@ class SignalsCoreComputedRecomputeBenchmark extends BenchmarkBase {
 }
 
 class SignalsCoreComputedChainBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
-  late final sig.Computed<int> doubled;
-  late final sig.Computed<int> sum;
+  late sig.Signal<int> s;
+  late sig.Computed<int> doubled;
+  late sig.Computed<int> sum;
   int _counter = 0;
   int _result = 0;
 
@@ -246,6 +233,7 @@ class SignalsCoreComputedChainBenchmark extends BenchmarkBase {
     s = sig.signal(0);
     doubled = sig.computed(() => s.value * 2);
     sum = sig.computed(() => doubled.value + 10);
+    _result = sum.value;
   }
 
   @override
@@ -262,13 +250,14 @@ class SignalsCoreComputedChainBenchmark extends BenchmarkBase {
   }
 }
 
-class SignalsCoreComputedChainManyDependentsBenchmark extends BenchmarkBase {
-  late final sig.Signal<int> s;
+class SignalsCoreComputedManyDependentsBenchmark extends BenchmarkBase {
+  late sig.Signal<int> s;
   final List<sig.Computed<int>> _computeds = [];
   int _counter = 0;
+  int _checksum = 0;
 
-  SignalsCoreComputedChainManyDependentsBenchmark({ScoreEmitter? emitter})
-      : super('Signals: Computed.chain.many_dependents',
+  SignalsCoreComputedManyDependentsBenchmark({ScoreEmitter? emitter})
+      : super('Signals: Computed.many_dependents',
             emitter: emitter ?? const PrintEmitter());
 
   @override
@@ -277,15 +266,15 @@ class SignalsCoreComputedChainManyDependentsBenchmark extends BenchmarkBase {
     for (var i = 0; i < 1000; i++) {
       final computed = sig.computed(() => s.value * 2);
       _computeds.add(computed);
+      _checksum += computed.value;
     }
   }
 
   @override
   void run() {
     s.value = ++_counter;
-    // Access all computeds to trigger recomputation
     for (final computed in _computeds) {
-      final _ = computed.value;
+      _checksum += computed.value;
     }
   }
 
@@ -294,6 +283,7 @@ class SignalsCoreComputedChainManyDependentsBenchmark extends BenchmarkBase {
     for (final computed in _computeds) {
       computed.dispose();
     }
+    _computeds.clear();
     s.dispose();
   }
 }
@@ -304,7 +294,7 @@ class SignalsCoreComputedChainManyDependentsBenchmark extends BenchmarkBase {
 
 Future<List<BenchmarkResult>> runBenchmark() async {
   // Create custom emitter to collect results
-  final emitter = CollectingScoreEmitter(_extractFeature);
+  final emitter = CollectingScoreEmitter(_extractFeature, _extractTiming);
 
   // State Holder Benchmarks
   SignalsCoreStoreCreateBenchmark(emitter: emitter).report();
@@ -318,14 +308,14 @@ Future<List<BenchmarkResult>> runBenchmark() async {
   SignalsCoreComputedReadBenchmark(emitter: emitter).report();
   SignalsCoreComputedRecomputeBenchmark(emitter: emitter).report();
   SignalsCoreComputedChainBenchmark(emitter: emitter).report();
-  SignalsCoreComputedChainManyDependentsBenchmark(emitter: emitter).report();
+  SignalsCoreComputedManyDependentsBenchmark(emitter: emitter).report();
 
   return emitter.results;
 }
 
 String _extractFeature(String benchmarkName) {
-  if (benchmarkName.contains('Signal.create')) {
-    return 'State Holder: Create';
+  if (benchmarkName.contains('Signal.lifecycle')) {
+    return 'State Holder: Lifecycle (Create + Use + Release)';
   }
   if (benchmarkName.contains('Signal.read')) {
     return 'State Holder: Read';
@@ -339,8 +329,8 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Signal.notify')) {
     return 'State Holder: Notify';
   }
-  if (benchmarkName.contains('Computed.create')) {
-    return 'Recomputable View: Create';
+  if (benchmarkName.contains('Computed.lifecycle')) {
+    return 'Recomputable View: Lifecycle (Create + Evaluate + Release)';
   }
   if (benchmarkName.contains('Computed.read')) {
     return 'Recomputable View: Read';
@@ -348,13 +338,17 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Computed.recompute')) {
     return 'Recomputable View: Recompute';
   }
-  if (benchmarkName.contains('Computed.chain.many_dependents')) {
-    return 'Recomputable View: Chain - Many Dependents (1000)';
+  if (benchmarkName.contains('Computed.many_dependents')) {
+    return 'Recomputable View: Many Dependents (1000)';
   }
   if (benchmarkName.contains('Computed.chain')) {
     return 'Recomputable View: Chain';
   }
   return benchmarkName;
+}
+
+BenchmarkTiming _extractTiming(String benchmarkName) {
+  return BenchmarkTiming.synchronous;
 }
 
 Future<void> main() async {

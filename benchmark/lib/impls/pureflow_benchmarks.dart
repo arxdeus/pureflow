@@ -3,7 +3,7 @@
 import 'dart:async';
 
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:benchmark/common/fair_benchmark_base.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:pureflow/pureflow.dart' as pf;
 
@@ -12,28 +12,22 @@ import 'package:pureflow/pureflow.dart' as pf;
 // ============================================================================
 
 class PureflowStoreCreateBenchmark extends BenchmarkBase {
-  final List<pf.Store<int>> _stores = [];
+  int _result = 0;
 
   PureflowStoreCreateBenchmark({ScoreEmitter? emitter})
-      : super('Pureflow: Store.create',
+      : super('Pureflow: Store.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
   void run() {
-    _stores.add(pf.Store<int>(42));
-  }
-
-  @override
-  void teardown() {
-    for (final store in _stores) {
-      store.dispose();
-    }
-    _stores.clear();
+    final store = pf.Store<int>(42);
+    _result = store.value;
+    store.dispose();
   }
 }
 
 class PureflowStoreReadBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
+  late pf.Store<int> store;
   int _result = 0;
 
   PureflowStoreReadBenchmark({ScoreEmitter? emitter})
@@ -56,7 +50,7 @@ class PureflowStoreReadBenchmark extends BenchmarkBase {
 }
 
 class PureflowStoreWriteBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
+  late pf.Store<int> store;
   int _counter = 0;
 
   PureflowStoreWriteBenchmark({ScoreEmitter? emitter})
@@ -80,9 +74,9 @@ class PureflowStoreWriteBenchmark extends BenchmarkBase {
 }
 
 class PureflowStoreNotifyBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
+  late pf.Store<int> store;
   int _counter = 0;
-  int _lastValue = 0;
+  int _checksum = 0;
 
   PureflowStoreNotifyBenchmark({ScoreEmitter? emitter})
       : super('Pureflow: Store.notify',
@@ -92,7 +86,7 @@ class PureflowStoreNotifyBenchmark extends BenchmarkBase {
   void setup() {
     store = pf.Store<int>(0);
     store.addListener(() {
-      _lastValue = store.value;
+      _checksum += store.value;
     });
   }
 
@@ -108,9 +102,10 @@ class PureflowStoreNotifyBenchmark extends BenchmarkBase {
 }
 
 class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
+  late pf.Store<int> store;
   final List<void Function()> _listeners = [];
   int _counter = 0;
+  int _checksum = 0;
 
   PureflowStoreNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super('Pureflow: Store.notify.many_dependents',
@@ -121,7 +116,7 @@ class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
     store = pf.Store<int>(0);
     for (var i = 0; i < 1000; i++) {
       void listener() {
-        final _ = store.value;
+        _checksum += store.value;
       }
 
       store.addListener(listener);
@@ -139,6 +134,7 @@ class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
     for (final listener in _listeners) {
       store.removeListener(listener);
     }
+    _listeners.clear();
     store.dispose();
   }
 }
@@ -148,36 +144,25 @@ class PureflowStoreNotifyManyDependentsBenchmark extends BenchmarkBase {
 // ============================================================================
 
 class PureflowComputedCreateBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
-  final List<pf.Computed<int>> _computeds = [];
+  int _result = 0;
 
   PureflowComputedCreateBenchmark({ScoreEmitter? emitter})
-      : super('Pureflow: Computed.create',
+      : super('Pureflow: Computed.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
-    store = pf.Store<int>(42);
-  }
-
-  @override
   void run() {
-    _computeds.add(pf.Computed(() => store.value * 2));
-  }
-
-  @override
-  void teardown() {
-    // Dispose store first to release dependency graph, then clear computeds.
-    // Pureflow uses linked list (O(1) removal), but disposing the source
-    // first is still faster than individual computed disposal.
+    final store = pf.Store<int>(42);
+    final computed = pf.Computed(() => store.value * 2);
+    _result = computed.value;
+    computed.dispose();
     store.dispose();
-    _computeds.clear();
   }
 }
 
 class PureflowComputedReadBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
-  late final pf.Computed<int> computed;
+  late pf.Store<int> store;
+  late pf.Computed<int> computed;
   int _result = 0;
 
   PureflowComputedReadBenchmark({ScoreEmitter? emitter})
@@ -188,6 +173,7 @@ class PureflowComputedReadBenchmark extends BenchmarkBase {
   void setup() {
     store = pf.Store<int>(42);
     computed = pf.Computed(() => store.value * 2);
+    _result = computed.value;
   }
 
   @override
@@ -203,8 +189,8 @@ class PureflowComputedReadBenchmark extends BenchmarkBase {
 }
 
 class PureflowComputedRecomputeBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
-  late final pf.Computed<int> computed;
+  late pf.Store<int> store;
+  late pf.Computed<int> computed;
   int _counter = 0;
   int _result = 0;
 
@@ -216,6 +202,7 @@ class PureflowComputedRecomputeBenchmark extends BenchmarkBase {
   void setup() {
     store = pf.Store<int>(0);
     computed = pf.Computed(() => store.value * 2);
+    _result = computed.value;
   }
 
   @override
@@ -232,9 +219,9 @@ class PureflowComputedRecomputeBenchmark extends BenchmarkBase {
 }
 
 class PureflowComputedChainBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
-  late final pf.Computed<int> doubled;
-  late final pf.Computed<int> sum;
+  late pf.Store<int> store;
+  late pf.Computed<int> doubled;
+  late pf.Computed<int> sum;
   int _counter = 0;
   int _result = 0;
 
@@ -247,6 +234,7 @@ class PureflowComputedChainBenchmark extends BenchmarkBase {
     store = pf.Store<int>(0);
     doubled = pf.Computed(() => store.value * 2);
     sum = pf.Computed(() => doubled.value + 10);
+    _result = sum.value;
   }
 
   @override
@@ -263,13 +251,14 @@ class PureflowComputedChainBenchmark extends BenchmarkBase {
   }
 }
 
-class PureflowComputedChainManyDependentsBenchmark extends BenchmarkBase {
-  late final pf.Store<int> store;
+class PureflowComputedManyDependentsBenchmark extends BenchmarkBase {
+  late pf.Store<int> store;
   final List<pf.Computed<int>> _computeds = [];
   int _counter = 0;
+  int _checksum = 0;
 
-  PureflowComputedChainManyDependentsBenchmark({ScoreEmitter? emitter})
-      : super('Pureflow: Computed.chain.many_dependents',
+  PureflowComputedManyDependentsBenchmark({ScoreEmitter? emitter})
+      : super('Pureflow: Computed.many_dependents',
             emitter: emitter ?? const PrintEmitter());
 
   @override
@@ -278,15 +267,15 @@ class PureflowComputedChainManyDependentsBenchmark extends BenchmarkBase {
     for (var i = 0; i < 1000; i++) {
       final computed = pf.Computed(() => store.value * 2);
       _computeds.add(computed);
+      _checksum += computed.value;
     }
   }
 
   @override
   void run() {
     store.value = ++_counter;
-    // Access all computeds to trigger recomputation
     for (final computed in _computeds) {
-      final _ = computed.value;
+      _checksum += computed.value;
     }
   }
 
@@ -295,6 +284,7 @@ class PureflowComputedChainManyDependentsBenchmark extends BenchmarkBase {
     for (final computed in _computeds) {
       computed.dispose();
     }
+    _computeds.clear();
     store.dispose();
   }
 }
@@ -304,12 +294,16 @@ class PureflowComputedChainManyDependentsBenchmark extends BenchmarkBase {
 // ============================================================================
 
 class PureflowPipelineSequentialBenchmark extends AsyncBenchmarkBase {
-  late final pf.Pipeline pipeline;
+  late pf.Pipeline pipeline;
   int _counter = 0;
+  final List<int> _completionOrder = [];
 
   PureflowPipelineSequentialBenchmark({ScoreEmitter? emitter})
-      : super('Pureflow: Pipeline.sequential',
-            emitter: emitter ?? const PrintEmitter());
+      : super(
+          'Pureflow: Pipeline.sequential',
+          emitter: emitter ?? const PrintEmitter(),
+          operationsPerRun: 2,
+        );
 
   @override
   Future<void> setup() async {
@@ -318,15 +312,32 @@ class PureflowPipelineSequentialBenchmark extends AsyncBenchmarkBase {
 
   @override
   Future<void> run() async {
-    // Use monotonic counter for deterministic results, consistent
-    // with Bloc's Sequential benchmark which also uses a counter.
-    final value = ++_counter;
+    final first = ++_counter;
+    final second = ++_counter;
+    _completionOrder.clear();
 
-    final result = await pipeline.run((context) async {
+    final firstFuture = pipeline.run((context) async {
       await Future<void>.delayed(Duration.zero);
-      return value;
+      _completionOrder.add(first);
+      return first;
     });
-    assert(value == result, 'Wrong pipeline value: $value');
+    final secondFuture = pipeline.run((context) async {
+      await Future<void>.delayed(Duration.zero);
+      _completionOrder.add(second);
+      return second;
+    });
+    final results = await Future.wait([firstFuture, secondFuture]);
+
+    if (results[0] != first || results[1] != second) {
+      throw StateError('Wrong pipeline values: $results != [$first, $second]');
+    }
+    if (_completionOrder.length != 2 ||
+        _completionOrder[0] != first ||
+        _completionOrder[1] != second) {
+      throw StateError(
+        'Pipeline operations completed out of order: $_completionOrder',
+      );
+    }
   }
 
   @override
@@ -341,7 +352,7 @@ class PureflowPipelineSequentialBenchmark extends AsyncBenchmarkBase {
 
 Future<List<BenchmarkResult>> runBenchmark() async {
   // Create custom emitter to collect results
-  final emitter = CollectingScoreEmitter(_extractFeature);
+  final emitter = CollectingScoreEmitter(_extractFeature, _extractTiming);
 
   // State Holder Benchmarks
   PureflowStoreCreateBenchmark(emitter: emitter).report();
@@ -355,7 +366,7 @@ Future<List<BenchmarkResult>> runBenchmark() async {
   PureflowComputedReadBenchmark(emitter: emitter).report();
   PureflowComputedRecomputeBenchmark(emitter: emitter).report();
   PureflowComputedChainBenchmark(emitter: emitter).report();
-  PureflowComputedChainManyDependentsBenchmark(emitter: emitter).report();
+  PureflowComputedManyDependentsBenchmark(emitter: emitter).report();
 
   // Async Configurable Concurrency Flow Benchmarks
   await PureflowPipelineSequentialBenchmark(emitter: emitter).report();
@@ -364,8 +375,8 @@ Future<List<BenchmarkResult>> runBenchmark() async {
 }
 
 String _extractFeature(String benchmarkName) {
-  if (benchmarkName.contains('Store.create')) {
-    return 'State Holder: Create';
+  if (benchmarkName.contains('Store.lifecycle')) {
+    return 'State Holder: Lifecycle (Create + Use + Release)';
   }
   if (benchmarkName.contains('Store.read')) {
     return 'State Holder: Read';
@@ -379,8 +390,8 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Store.notify')) {
     return 'State Holder: Notify';
   }
-  if (benchmarkName.contains('Computed.create')) {
-    return 'Recomputable View: Create';
+  if (benchmarkName.contains('Computed.lifecycle')) {
+    return 'Recomputable View: Lifecycle (Create + Evaluate + Release)';
   }
   if (benchmarkName.contains('Computed.read')) {
     return 'Recomputable View: Read';
@@ -388,8 +399,8 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Computed.recompute')) {
     return 'Recomputable View: Recompute';
   }
-  if (benchmarkName.contains('Computed.chain.many_dependents')) {
-    return 'Recomputable View: Chain - Many Dependents (1000)';
+  if (benchmarkName.contains('Computed.many_dependents')) {
+    return 'Recomputable View: Many Dependents (1000)';
   }
   if (benchmarkName.contains('Computed.chain')) {
     return 'Recomputable View: Chain';
@@ -398,6 +409,13 @@ String _extractFeature(String benchmarkName) {
     return 'Async Concurrency: Sequential';
   }
   return benchmarkName;
+}
+
+BenchmarkTiming _extractTiming(String benchmarkName) {
+  if (benchmarkName.contains('Pipeline.sequential')) {
+    return BenchmarkTiming.asyncSettled;
+  }
+  return BenchmarkTiming.synchronous;
 }
 
 Future<void> main() async {

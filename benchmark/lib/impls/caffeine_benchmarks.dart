@@ -3,8 +3,16 @@
 import 'dart:async';
 
 import 'package:benchmark/common/benchmark_result.dart';
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:benchmark/common/fair_benchmark_base.dart';
 import 'package:caffeine/caffeine.dart' as cf;
+
+// The same batch size is used by Bloc and Caffeine. Sensitivity checks at
+// 16/32/64 operations showed per-operation scores had reached a stable range
+// by 32 while keeping each harness exercise bounded.
+const _asyncDeliveryBatchSize = 32;
+
+int _expectedBatchSum(int first) =>
+    _asyncDeliveryBatchSize * (2 * first + _asyncDeliveryBatchSize - 1) ~/ 2;
 
 // ============================================================================
 // Notes on Caffeine's model
@@ -16,11 +24,10 @@ import 'package:caffeine/caffeine.dart' as cf;
 //    instances are created on first `scope.read`. We force instantiation in
 //    `setup`/`run` via `scope.read` to make timings comparable.
 //
-// 2. Writes are events. There is no synchronous setter — state changes are
-//    driven by `scope.fire(event, value)` and handlers are `async*` generators.
-//    State settles after a microtask. The write/notify/recompute benchmarks
-//    therefore use `AsyncBenchmarkBase` and await one microtask per `run()`,
-//    which is inherent to caffeine's design (not extra harness overhead).
+// 2. Writes are events. There is no synchronous setter, so Caffeine is not
+//    included in the synchronous write row. Notify/recompute benchmarks await
+//    native stream settlement and batch operations so one harness Completer
+//    and await are amortized across [_asyncDeliveryBatchSize] updates.
 //
 // 3. There is no plain "addListener" API. Subscriptions go through
 //    `scope.stream(store)`, which is a broadcast `Stream<T>`. Notify benchmarks
@@ -31,34 +38,18 @@ import 'package:caffeine/caffeine.dart' as cf;
 // ============================================================================
 
 class CaffeineStoreCreateBenchmark extends BenchmarkBase {
-  late cf.Scope scope;
-  int _i = 0;
-  final List<cf.Store<int>> _stores = [];
+  int _result = 0;
 
   CaffeineStoreCreateBenchmark({ScoreEmitter? emitter})
-      : super('Caffeine: Store.create',
+      : super('Caffeine: Store.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
-    scope = cf.Scope();
-  }
-
-  @override
   void run() {
-    // Construct a fresh store descriptor and force instantiation by reading
-    // it through a freshly-forked scope so the cost includes both the
-    // descriptor allocation and runtime materialization.
-    final s = cf.Store<int>.accum((ctx) => 42 + (_i++));
-    final fork = scope.fork(overrides: {s});
-    fork.read(s);
-    _stores.add(s);
-  }
-
-  @override
-  void teardown() {
+    final scope = cf.Scope();
+    final s = cf.Store<int>.accum((ctx) => 42);
+    _result = scope.read(s);
     scope.dispose();
-    _stores.clear();
   }
 }
 
@@ -68,8 +59,7 @@ class CaffeineStoreReadBenchmark extends BenchmarkBase {
   int _result = 0;
 
   CaffeineStoreReadBenchmark({ScoreEmitter? emitter})
-      : super('Caffeine: Store.read',
-            emitter: emitter ?? const PrintEmitter());
+      : super('Caffeine: Store.read', emitter: emitter ?? const PrintEmitter());
 
   @override
   void setup() {
@@ -90,54 +80,21 @@ class CaffeineStoreReadBenchmark extends BenchmarkBase {
   }
 }
 
-class CaffeineStoreWriteBenchmark extends AsyncBenchmarkBase {
-  late cf.Scope scope;
-  late cf.Store<int> store;
-  late cf.Event<int> setValue;
-  int _counter = 0;
-
-  CaffeineStoreWriteBenchmark({ScoreEmitter? emitter})
-      : super('Caffeine: Store.write',
-            emitter: emitter ?? const PrintEmitter());
-
-  @override
-  Future<void> setup() async {
-    scope = cf.Scope();
-    setValue = const cf.Event<int>();
-    store = cf.Store<int>.accum((ctx) {
-      ctx.on(setValue, (v) async* {
-        yield v;
-      });
-      return 0;
-    });
-    scope.read(store);
-  }
-
-  @override
-  Future<void> run() async {
-    scope.fire(setValue, ++_counter);
-    // Drain the microtask queue so the async* handler completes and
-    // the new state is committed before the next iteration.
-    await Future<void>.delayed(Duration.zero);
-  }
-
-  @override
-  Future<void> teardown() async {
-    scope.dispose();
-  }
-}
-
 class CaffeineStoreNotifyBenchmark extends AsyncBenchmarkBase {
   late cf.Scope scope;
   late cf.Store<int> store;
   late cf.Event<int> setValue;
   late StreamSubscription<int> _sub;
   int _counter = 0;
+  int _remaining = 0;
   int _lastValue = 0;
+  late Completer<void> _batchDone;
+  int _checksum = 0;
 
   CaffeineStoreNotifyBenchmark({ScoreEmitter? emitter})
       : super('Caffeine: Store.notify',
-            emitter: emitter ?? const PrintEmitter());
+            emitter: emitter ?? const PrintEmitter(),
+            operationsPerRun: _asyncDeliveryBatchSize);
 
   @override
   Future<void> setup() async {
@@ -150,13 +107,37 @@ class CaffeineStoreNotifyBenchmark extends AsyncBenchmarkBase {
       return 0;
     });
     scope.read(store);
-    _sub = scope.stream(store).listen((v) => _lastValue = v);
+    _batchDone = Completer<void>();
+    _sub = scope.stream(store).listen((v) {
+      _checksum += v;
+      _lastValue = v;
+      if (_remaining == 0) return;
+      if (--_remaining == 0) {
+        _batchDone.complete();
+      } else {
+        _fireNext();
+      }
+    });
   }
+
+  void _fireNext() => scope.fire(setValue, ++_counter);
 
   @override
   Future<void> run() async {
-    scope.fire(setValue, ++_counter);
-    await Future<void>.delayed(Duration.zero);
+    final first = _counter + 1;
+    final checksumBefore = _checksum;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _fireNext();
+    await _batchDone.future;
+
+    final expectedLast = first + _asyncDeliveryBatchSize - 1;
+    final actualSum = _checksum - checksumBefore;
+    if (_lastValue != expectedLast || actualSum != _expectedBatchSum(first)) {
+      throw StateError(
+        'Wrong caffeine notifications: last=$_lastValue, sum=$actualSum',
+      );
+    }
   }
 
   @override
@@ -172,10 +153,16 @@ class CaffeineStoreNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
   late cf.Event<int> setValue;
   final List<StreamSubscription<int>> _subs = [];
   int _counter = 0;
+  int _notified = 0;
+  int _remaining = 0;
+  int _lastValue = 0;
+  late Completer<void> _batchDone;
+  int _checksum = 0;
 
   CaffeineStoreNotifyManyDependentsBenchmark({ScoreEmitter? emitter})
       : super('Caffeine: Store.notify.many_dependents',
-            emitter: emitter ?? const PrintEmitter());
+            emitter: emitter ?? const PrintEmitter(),
+            operationsPerRun: _asyncDeliveryBatchSize);
 
   @override
   Future<void> setup() async {
@@ -188,16 +175,43 @@ class CaffeineStoreNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
       return 0;
     });
     scope.read(store);
+    _batchDone = Completer<void>();
     final stream = scope.stream(store);
     for (var i = 0; i < 1000; i++) {
-      _subs.add(stream.listen((_) {}));
+      _subs.add(stream.listen((value) {
+        _checksum += value;
+        _lastValue = value;
+        if (_remaining == 0 || ++_notified != 1000) return;
+        _notified = 0;
+        if (--_remaining == 0) {
+          _batchDone.complete();
+        } else {
+          _fireNext();
+        }
+      }));
     }
   }
 
+  void _fireNext() => scope.fire(setValue, ++_counter);
+
   @override
   Future<void> run() async {
-    scope.fire(setValue, ++_counter);
-    await Future<void>.delayed(Duration.zero);
+    final first = _counter + 1;
+    final checksumBefore = _checksum;
+    _notified = 0;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _fireNext();
+    await _batchDone.future;
+
+    final expectedLast = first + _asyncDeliveryBatchSize - 1;
+    final actualSum = _checksum - checksumBefore;
+    final expectedSum = _expectedBatchSum(first) * 1000;
+    if (_lastValue != expectedLast || actualSum != expectedSum) {
+      throw StateError(
+        'Wrong caffeine fan-out: last=$_lastValue, sum=$actualSum',
+      );
+    }
   }
 
   @override
@@ -215,33 +229,19 @@ class CaffeineStoreNotifyManyDependentsBenchmark extends AsyncBenchmarkBase {
 // ============================================================================
 
 class CaffeineComputedCreateBenchmark extends BenchmarkBase {
-  late cf.Scope scope;
-  late cf.Store<int> store;
-  final List<cf.Store<int>> _computeds = [];
+  int _result = 0;
 
   CaffeineComputedCreateBenchmark({ScoreEmitter? emitter})
-      : super('Caffeine: Computed.create',
+      : super('Caffeine: Computed.lifecycle',
             emitter: emitter ?? const PrintEmitter());
 
   @override
-  void setup() {
-    scope = cf.Scope();
-    store = cf.Store<int>.accum((ctx) => 42);
-    scope.read(store);
-  }
-
-  @override
   void run() {
+    final scope = cf.Scope();
+    final store = cf.Store<int>.accum((ctx) => 42);
     final derived = cf.Store<int>.derive((s) => store(s) * 2);
-    // Force instantiation so the cost includes registering dependencies.
-    scope.read(derived);
-    _computeds.add(derived);
-  }
-
-  @override
-  void teardown() {
+    _result = scope.read(derived);
     scope.dispose();
-    _computeds.clear();
   }
 }
 
@@ -282,10 +282,15 @@ class CaffeineComputedRecomputeBenchmark extends AsyncBenchmarkBase {
   late cf.Event<int> setValue;
   int _counter = 0;
   int _result = 0;
+  int _remaining = 0;
+  late StreamSubscription<int> _subscription;
+  late Completer<void> _batchDone;
+  int _computedChecksum = 0;
 
   CaffeineComputedRecomputeBenchmark({ScoreEmitter? emitter})
       : super('Caffeine: Computed.recompute',
-            emitter: emitter ?? const PrintEmitter());
+            emitter: emitter ?? const PrintEmitter(),
+            operationsPerRun: _asyncDeliveryBatchSize);
 
   @override
   Future<void> setup() async {
@@ -300,17 +305,41 @@ class CaffeineComputedRecomputeBenchmark extends AsyncBenchmarkBase {
     computed = cf.Store<int>.derive((s) => store(s) * 2);
     scope.read(store);
     scope.read(computed);
+    _batchDone = Completer<void>();
+    _subscription = scope.stream(computed).listen((value) {
+      _result = value;
+      _computedChecksum += value;
+      if (_remaining == 0) return;
+      if (--_remaining == 0) {
+        _batchDone.complete();
+      } else {
+        _fireNext();
+      }
+    });
   }
+
+  void _fireNext() => scope.fire(setValue, ++_counter);
 
   @override
   Future<void> run() async {
-    scope.fire(setValue, ++_counter);
-    await Future<void>.delayed(Duration.zero);
-    _result = scope.read(computed);
+    final first = _counter + 1;
+    final computedBefore = _computedChecksum;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _fireNext();
+    await _batchDone.future;
+
+    final sourceSum = _expectedBatchSum(first);
+    final expectedLast = (first + _asyncDeliveryBatchSize - 1) * 2;
+    if (_computedChecksum - computedBefore != sourceSum * 2 ||
+        _result != expectedLast) {
+      throw StateError('Wrong caffeine recompute batch.');
+    }
   }
 
   @override
   Future<void> teardown() async {
+    await _subscription.cancel();
     scope.dispose();
   }
 }
@@ -323,10 +352,15 @@ class CaffeineComputedChainBenchmark extends AsyncBenchmarkBase {
   late cf.Event<int> setValue;
   int _counter = 0;
   int _result = 0;
+  int _remaining = 0;
+  late StreamSubscription<int> _subscription;
+  late Completer<void> _batchDone;
+  int _computedChecksum = 0;
 
   CaffeineComputedChainBenchmark({ScoreEmitter? emitter})
       : super('Caffeine: Computed.chain',
-            emitter: emitter ?? const PrintEmitter());
+            emitter: emitter ?? const PrintEmitter(),
+            operationsPerRun: _asyncDeliveryBatchSize);
 
   @override
   Future<void> setup() async {
@@ -343,31 +377,62 @@ class CaffeineComputedChainBenchmark extends AsyncBenchmarkBase {
     scope.read(store);
     scope.read(doubled);
     scope.read(sum);
+    _batchDone = Completer<void>();
+    _subscription = scope.stream(sum).listen((value) {
+      _result = value;
+      _computedChecksum += value;
+      if (_remaining == 0) return;
+      if (--_remaining == 0) {
+        _batchDone.complete();
+      } else {
+        _fireNext();
+      }
+    });
   }
+
+  void _fireNext() => scope.fire(setValue, ++_counter);
 
   @override
   Future<void> run() async {
-    scope.fire(setValue, ++_counter);
-    await Future<void>.delayed(Duration.zero);
-    _result = scope.read(sum);
+    final first = _counter + 1;
+    final computedBefore = _computedChecksum;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _fireNext();
+    await _batchDone.future;
+
+    final sourceSum = _expectedBatchSum(first);
+    final expectedComputedSum = sourceSum * 2 + 10 * _asyncDeliveryBatchSize;
+    final expectedLast = (first + _asyncDeliveryBatchSize - 1) * 2 + 10;
+    if (_computedChecksum - computedBefore != expectedComputedSum ||
+        _result != expectedLast) {
+      throw StateError('Wrong caffeine chain batch.');
+    }
   }
 
   @override
   Future<void> teardown() async {
+    await _subscription.cancel();
     scope.dispose();
   }
 }
 
-class CaffeineComputedChainManyDependentsBenchmark extends AsyncBenchmarkBase {
+class CaffeineComputedManyDependentsBenchmark extends AsyncBenchmarkBase {
   late cf.Scope scope;
   late cf.Store<int> store;
   late cf.Event<int> setValue;
   final List<cf.Store<int>> _computeds = [];
   int _counter = 0;
+  int _remaining = 0;
+  late StreamSubscription<int> _subscription;
+  late Completer<void> _batchDone;
+  int _sourceChecksum = 0;
+  int _checksum = 0;
 
-  CaffeineComputedChainManyDependentsBenchmark({ScoreEmitter? emitter})
-      : super('Caffeine: Computed.chain.many_dependents',
-            emitter: emitter ?? const PrintEmitter());
+  CaffeineComputedManyDependentsBenchmark({ScoreEmitter? emitter})
+      : super('Caffeine: Computed.many_dependents',
+            emitter: emitter ?? const PrintEmitter(),
+            operationsPerRun: _asyncDeliveryBatchSize);
 
   @override
   Future<void> setup() async {
@@ -385,19 +450,50 @@ class CaffeineComputedChainManyDependentsBenchmark extends AsyncBenchmarkBase {
       scope.read(derived);
       _computeds.add(derived);
     }
+    _batchDone = Completer<void>();
+    _subscription = scope.stream(store).listen((value) {
+      _sourceChecksum += value;
+      if (_remaining > 0) scheduleMicrotask(_consumeSettledValues);
+    });
+  }
+
+  void _fireNext() => scope.fire(setValue, ++_counter);
+
+  void _consumeSettledValues() {
+    // Source streams emit before sibling propagation. Waiting one microtask is
+    // the stable post-flush barrier: subscribing to one sibling is unstable as
+    // Caffeine retracks and reorders dependencies, while an aggregate derived
+    // store would add 1000 tracked edges and change the workload substantially.
+    for (final computed in _computeds) {
+      _checksum += scope.read(computed);
+    }
+    if (--_remaining == 0) {
+      _batchDone.complete();
+    } else {
+      _fireNext();
+    }
   }
 
   @override
   Future<void> run() async {
-    scope.fire(setValue, ++_counter);
-    await Future<void>.delayed(Duration.zero);
-    for (final c in _computeds) {
-      final _ = scope.read(c);
+    final first = _counter + 1;
+    final sourceBefore = _sourceChecksum;
+    final computedBefore = _checksum;
+    _remaining = _asyncDeliveryBatchSize;
+    _batchDone = Completer<void>();
+    _fireNext();
+    await _batchDone.future;
+
+    final sourceSum = _expectedBatchSum(first);
+    if (_sourceChecksum - sourceBefore != sourceSum ||
+        _checksum - computedBefore != sourceSum * 2 * 1000) {
+      throw StateError('Wrong caffeine computed fan-out batch.');
     }
   }
 
   @override
   Future<void> teardown() async {
+    await _subscription.cancel();
     scope.dispose();
     _computeds.clear();
   }
@@ -409,7 +505,7 @@ class CaffeineComputedChainManyDependentsBenchmark extends AsyncBenchmarkBase {
 
 /// Caffeine event handlers are `async*` generators. Each fired event runs the
 /// handler to completion before the next state is observable. This benchmark
-/// fires one event per iteration and awaits the resulting state via
+/// fires two events back-to-back per iteration and awaits both states via
 /// `scope.stream`, mirroring Bloc's `sequential()` transformer benchmark and
 /// Pureflow's `Pipeline.sequential` benchmark.
 class CaffeineSequentialBenchmark extends AsyncBenchmarkBase {
@@ -419,10 +515,15 @@ class CaffeineSequentialBenchmark extends AsyncBenchmarkBase {
   late StreamSubscription<int> _subscription;
   late Completer<int> _completer;
   int _counter = 0;
+  final List<int> _received = [];
+  int _checksum = 0;
 
   CaffeineSequentialBenchmark({ScoreEmitter? emitter})
-      : super('Caffeine: Sequential',
-            emitter: emitter ?? const PrintEmitter());
+      : super(
+          'Caffeine: Sequential',
+          emitter: emitter ?? const PrintEmitter(),
+          operationsPerRun: 2,
+        );
 
   @override
   Future<void> setup() async {
@@ -432,7 +533,7 @@ class CaffeineSequentialBenchmark extends AsyncBenchmarkBase {
       ctx.on(setValue, (v) async* {
         await Future<void>.delayed(Duration.zero);
         yield v;
-      });
+      }, concurrency: cf.Concurrency.queue);
       return 0;
     });
     scope.read(store);
@@ -440,7 +541,9 @@ class CaffeineSequentialBenchmark extends AsyncBenchmarkBase {
     // Single persistent subscription — same pattern as the Bloc benchmark to
     // avoid racy per-iteration subscribe/cancel on a broadcast stream.
     _subscription = scope.stream(store).listen((state) {
-      if (!_completer.isCompleted) {
+      _received.add(state);
+      _checksum += state;
+      if (_received.length == 2 && !_completer.isCompleted) {
         _completer.complete(state);
       }
     });
@@ -448,11 +551,17 @@ class CaffeineSequentialBenchmark extends AsyncBenchmarkBase {
 
   @override
   Future<void> run() async {
-    final value = ++_counter;
+    final first = ++_counter;
+    final second = ++_counter;
+    _received.clear();
     _completer = Completer<int>();
-    scope.fire(setValue, value);
-    final newValue = await _completer.future;
-    assert(value == newValue, 'Wrong caffeine value: $value != $newValue');
+    scope
+      ..fire(setValue, first)
+      ..fire(setValue, second);
+    await _completer.future;
+    if (_received[0] != first || _received[1] != second) {
+      throw StateError('Wrong caffeine order: $_received != [$first, $second]');
+    }
   }
 
   @override
@@ -467,12 +576,11 @@ class CaffeineSequentialBenchmark extends AsyncBenchmarkBase {
 // ============================================================================
 
 Future<List<BenchmarkResult>> runBenchmark() async {
-  final emitter = CollectingScoreEmitter(_extractFeature);
+  final emitter = CollectingScoreEmitter(_extractFeature, _extractTiming);
 
   // State Holder Benchmarks
   CaffeineStoreCreateBenchmark(emitter: emitter).report();
   CaffeineStoreReadBenchmark(emitter: emitter).report();
-  await CaffeineStoreWriteBenchmark(emitter: emitter).report();
   await CaffeineStoreNotifyBenchmark(emitter: emitter).report();
   await CaffeineStoreNotifyManyDependentsBenchmark(emitter: emitter).report();
 
@@ -481,7 +589,7 @@ Future<List<BenchmarkResult>> runBenchmark() async {
   CaffeineComputedReadBenchmark(emitter: emitter).report();
   await CaffeineComputedRecomputeBenchmark(emitter: emitter).report();
   await CaffeineComputedChainBenchmark(emitter: emitter).report();
-  await CaffeineComputedChainManyDependentsBenchmark(emitter: emitter).report();
+  await CaffeineComputedManyDependentsBenchmark(emitter: emitter).report();
 
   // Async Configurable Concurrency Flow Benchmarks
   await CaffeineSequentialBenchmark(emitter: emitter).report();
@@ -490,14 +598,11 @@ Future<List<BenchmarkResult>> runBenchmark() async {
 }
 
 String _extractFeature(String benchmarkName) {
-  if (benchmarkName.contains('Store.create')) {
-    return 'State Holder: Create';
+  if (benchmarkName.contains('Store.lifecycle')) {
+    return 'State Holder: Lifecycle (Create + Use + Release)';
   }
   if (benchmarkName.contains('Store.read')) {
     return 'State Holder: Read';
-  }
-  if (benchmarkName.contains('Store.write')) {
-    return 'State Holder: Write';
   }
   if (benchmarkName.contains('Store.notify.many_dependents')) {
     return 'State Holder: Notify - Many Dependents (1000)';
@@ -505,8 +610,8 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Store.notify')) {
     return 'State Holder: Notify';
   }
-  if (benchmarkName.contains('Computed.create')) {
-    return 'Recomputable View: Create';
+  if (benchmarkName.contains('Computed.lifecycle')) {
+    return 'Recomputable View: Lifecycle (Create + Evaluate + Release)';
   }
   if (benchmarkName.contains('Computed.read')) {
     return 'Recomputable View: Read';
@@ -514,8 +619,8 @@ String _extractFeature(String benchmarkName) {
   if (benchmarkName.contains('Computed.recompute')) {
     return 'Recomputable View: Recompute';
   }
-  if (benchmarkName.contains('Computed.chain.many_dependents')) {
-    return 'Recomputable View: Chain - Many Dependents (1000)';
+  if (benchmarkName.contains('Computed.many_dependents')) {
+    return 'Recomputable View: Many Dependents (1000)';
   }
   if (benchmarkName.contains('Computed.chain')) {
     return 'Recomputable View: Chain';
@@ -524,6 +629,17 @@ String _extractFeature(String benchmarkName) {
     return 'Async Concurrency: Sequential';
   }
   return benchmarkName;
+}
+
+BenchmarkTiming _extractTiming(String benchmarkName) {
+  if (benchmarkName.contains('Store.notify') ||
+      benchmarkName.contains('Computed.recompute') ||
+      benchmarkName.contains('Computed.chain') ||
+      benchmarkName.contains('Computed.many_dependents') ||
+      benchmarkName.contains('Sequential')) {
+    return BenchmarkTiming.asyncSettled;
+  }
+  return BenchmarkTiming.synchronous;
 }
 
 Future<void> main() async {
